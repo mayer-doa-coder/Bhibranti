@@ -1,0 +1,7 @@
+run_id,date,model,input_format,preprocessing,seed,lr,batch,epochs,split,dev_macro_f1,test_macro_f1,notes
+audit_001,2026-08-23,shortcut_probe_metadata,candidate_answer_only,none,42,,,,bn_dev_benchmark,,0.506,"V1 gate PASS (<0.60) on Bengali-script benchmark; labels 1=correct per PRD 5.1a"
+audit_002,2026-08-23,answer_only_char_ngram,candidate_answer_only,none,42,,,,bn_dev_benchmark,,0.569,"V3 answer-only probe; mild lexical signal"
+audit_003,2026-08-23,context_substring_rule,rule_based,none,42,,,,bn_dev_benchmark,,0.832,"SHORTCUT: string-matching beats the 0.80 has-context target; not a model result"
+audit_004,2026-08-23,majority_class,none,none,42,,,,bn_dev_benchmark,,0.338,"sanity baseline"
+pilot_001,2026-08-23,rule_based_transliteration_v1,pair_selection+draft_translit,none,42,,,,generated/pilot_v1,,0.505,"M1 gate PASS on 500-pair Banglish draft; substring shortcut 0.742 (down from 0.832); needs human review"
+agreement_001,2026-08-23,agreement_test_build,pair_selection,none,42,,,,annotated/agreement_test_v1,,,"100-item blind M2 guideline check built; 60/40 has-no-context, 50/50 label; awaiting 2 human annotators"

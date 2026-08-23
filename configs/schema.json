@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BanglishHallu Phase 1 record",
+  "description": "Frozen at M0. Adding a field is allowed; renaming, removing or repurposing one is not - it breaks Phase 2 inheritance. See docs/PRD.md section 5.1 and docs/IMPLEMENTATION_GUIDE.md section 2.",
+  "type": "object",
+  "required": [
+    "id", "source", "condition", "question", "candidate_answer", "label",
+    "hallucination_type", "script_condition"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id":                 { "type": "string", "pattern": "^[a-z]+_[0-9]+(_[0-9]+)?$" },
+    "pair_id":            { "type": "string", "description": "Groups a question with its faithful and hallucinated answers. Splits MUST be grouped on this." },
+    "pair_complete":      { "type": "boolean" },
+    "source":             { "type": "string", "description": "Must have a matching entry in data/SOURCES.md before ingestion (PRD D10)." },
+    "source_corpus":      { "type": "string", "description": "Upstream content origin, e.g. 'bengali_wikipedia+bcs_question_banks'. Must match an entry in data/SOURCES.md (PRD D10)." },
+    "source_file":        { "type": "string" },
+    "source_line":        { "type": "integer" },
+    "subject":            { "type": "string" },
+    "level":              { "enum": ["SSC", "HSC", "BCS", "unknown"] },
+    "condition":          { "enum": ["has_context", "no_context"] },
+    "context":            { "type": "string", "description": "Empty string when condition is no_context." },
+    "question":           { "type": "string", "minLength": 1 },
+    "reference_answer":   { "type": "string" },
+    "candidate_answer":   { "type": "string", "minLength": 1 },
+    "label":              { "enum": [0, 1], "description": "PROJECT-WIDE CONVENTION (PRD 5.1a): 1 = CORRECT / FAITHFUL, 0 = INCORRECT / HALLUCINATED. An is-it-correct? flag. This matches the bn_qa_pool source files natively, so no flip is applied anywhere in the pipeline. Note the positive class (1) is faithful, not hallucinated - the reverse of much of the literature." },
+    "hallucination_type": {
+      "enum": ["none", "entity", "numeric", "relational", "contradiction", "fabricated", "overclaim", "unlabeled"],
+      "description": "Intrinsic (has_context): entity, numeric, relational, contradiction. Extrinsic (no_context): fabricated, overclaim. Faithful class (label == 1): none. 'unlabeled' is PROVISIONAL for un-annotated interim data only and must never appear in a released split (PRD D8)."
+    },
+    "difficulty":         { "enum": ["easy", "hard", "unlabeled"] },
+    "generator_model":    { "type": "string" },
+    "generation_seed":    { "type": ["integer", "null"] },
+    "annotator_1":        { "type": ["integer", "null"], "enum": [0, 1, null] },
+    "annotator_2":        { "type": ["integer", "null"], "enum": [0, 1, null] },
+    "adjudicated":        { "type": "boolean" },
+    "provenance":         { "enum": ["human_written", "transliterated", "llm_rewritten", "llm_generated", "vendor_pool"], "description": "How the record's text was produced. PRD D6 - at least 500 items must be human_written. 'llm_generated' = QA pair built with LLM assistance from source text (Wikipedia / BCS banks); see data/SOURCES.md. Keeping this accurate is what makes the generated-vs-human comparison (PRD D7, V4) possible." },
+    "script_condition":   { "enum": ["banglish", "bengali_script", "english", "mixed"], "description": "Phase 2 payload. Populate, do not evaluate on it in Phase 1." },
+    "cmi":                { "type": ["number", "null"], "minimum": 0, "maximum": 100, "description": "Code-Mixing Index (Das & Gambaeck). Phase 2 payload." },
+    "cmi_method":         { "enum": ["script_proxy", "token_lang_id"], "description": "script_proxy is only valid for text with no romanised Bangla." },
+    "bengali_ratio":      { "type": "number", "minimum": 0, "maximum": 1 },
+    "error_span":         { "type": "string", "description": "Phase 2 payload. Capture at generation time; not evaluated in Phase 1." }
+  },
+  "x-invariants": [
+    "label == 1  <->  hallucination_type == 'none'   (1 = correct, PRD 5.1a)",
+    "label == 0  ->  hallucination_type != 'none'   (0 = hallucinated)",
+    "condition == 'no_context'  ->  context == ''",
+    "condition == 'no_context'  ->  hallucination_type in ['none','fabricated','overclaim','unlabeled']",
+    "condition == 'has_context' ->  hallucination_type in ['none','entity','numeric','relational','contradiction','unlabeled']",
+    "no pair_id may appear in more than one split",
+    "released splits must contain no 'unlabeled' values"
+  ]
+}

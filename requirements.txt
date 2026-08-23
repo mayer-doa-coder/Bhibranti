@@ -1,0 +1,52 @@
+# BanglishHallu Phase 1 — pinned dependencies (PRD R5)
+#
+# Two tiers, because the data pipeline and the model ladder have very
+# different install weights and the data work does not need torch.
+#
+#   pip install -r requirements.txt          <- everything below
+#
+# Verified working on Python 3.14.2, Windows 11, 2026-08-23.
+
+# ---------------------------------------------------------------------------
+# TIER 1 — data pipeline. Needed by every script that exists TODAY:
+#   src/build_bn_pool.py, src/build_pilot.py,
+#   src/build_agreement_test.py, src/audit.py
+# ---------------------------------------------------------------------------
+numpy==2.4.2
+scipy==1.17.1
+scikit-learn==1.9.0
+pandas==3.0.1
+
+# Transliteration reference tool (guide sec 3.3). src/build_pilot.py uses its
+# own rule-based mapper rather than this, but it is pinned because it is the
+# comparison baseline quoted in data/generated/pilot_v1/README.md.
+indic-transliteration==2.3.82
+
+# ---------------------------------------------------------------------------
+# TIER 2 — model ladder. NOT yet used by any script in src/. Uncomment when
+# starting M4 (train_classical.py / train_transformer.py). Left commented so a
+# fresh `pip install -r requirements.txt` stays fast and does not pull ~2.5 GB
+# of CUDA wheels before you need them.
+#
+# Pin these at the versions you actually train on, then update this file --
+# an unpinned training run is not reproducible (PRD R5, R6).
+# ---------------------------------------------------------------------------
+# torch
+# transformers
+# datasets
+# accelerate
+# evaluate
+# sentencepiece
+# protobuf
+# gensim                 # Skip-gram / Word2Vec (guide sec 7.1)
+# xgboost                # Skip-gram + XGBoost baseline
+# statsmodels            # McNemar's test (guide sec 12.2)
+# krippendorff           # inter-annotator agreement (guide sec 5.2)
+# sacremoses
+# regex
+# matplotlib
+# seaborn
+
+# REQUIRED for BanglaBERT / BanglishBERT — they were pretrained with this
+# normaliser and skipping it costs accuracy (guide sec 6, Arm B):
+# git+https://github.com/csebuetnlp/normalizer

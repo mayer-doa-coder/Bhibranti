@@ -99,36 +99,59 @@ direction used by Arm B.
 
 ## 3. Repository structure
 
+**This is the ACTUAL current tree, not just the plan.** ✅ = exists and works today.
+⬜ = not built yet. Follow the arrows below for the order things get built in.
+
 ```
 banglishhallu/
 ├── data/
-│   ├── raw/                  # sourced QA pairs, unmodified
-│   ├── generated/            # LLM-generated candidate answers
-│   ├── annotated/            # post-human-annotation
-│   ├── splits/               # train.jsonl / dev.jsonl / test.jsonl  <- deterministic, script-made
-│   └── SOURCES.md            # licence register — REQUIRED, one row per source
+│   ├── raw/bn_qa_pool/                       ✅ 14 source files, verbatim, 62,084 records
+│   │   └── MANIFEST.md                       ✅ per-file checksums + licence pointer
+│   ├── interim/bn_pool.jsonl                 ✅ 56,480 cleaned + schema-mapped records
+│   ├── generated/                            <- Banglish drafts live here
+│   │   └── pilot_v1/                         ✅ 500 pairs, M1 gate PASSES (0.505)
+│   │       ├── pilot.jsonl                       the 1,000 schema records
+│   │       ├── review_sheet.csv                  <- open this to do Task 3 (your read-through)
+│   │       ├── selection_log.csv
+│   │       └── validation_report.txt
+│   ├── annotated/                            <- human-labeled data lives here
+│   │   └── agreement_test_v1/                ✅ the 100-item M2 guideline check
+│   │       ├── items_for_annotation_BLANK.csv    <- open this to do the annotation test
+│   │       ├── answer_key_DO_NOT_OPEN_YET.csv    <- don't touch until both annotators finish
+│   │       └── selection_log.csv
+│   ├── splits/
+│   │   ├── bn_dev_benchmark/                 ✅ Bengali-script pipeline sandbox (3112/531/538)
+│   │   └── train.jsonl / dev.jsonl / test.jsonl  ⬜ the REAL locked splits — made at M3
+│   ├── DATASET_AUDIT.md                      ✅ read this first, before touching data/
+│   └── SOURCES.md                            ✅ licence register (2 questions still open)
 ├── src/
-│   ├── generate.py           # Step 4 — paired faithful/hallucinated generation
-│   ├── audit.py              # Step 9 — shortcut probe + answer-only probe   <- THE GATE
-│   ├── preprocess.py         # Step 6 — Arms A/B/C, formats F1/F2/F3, CMI
-│   ├── train_classical.py    # Step 7.1 — N-gram, Skip-gram, BiRNN, BiLSTM
-│   ├── train_transformer.py  # Step 7.2 — encoder fine-tuning
-│   ├── further_pretrain.py   # Step 8 — MLM further pretraining
-│   └── evaluate.py           # Step 12 — metrics, breakdowns, significance tests
-├── notebooks/                # exploratory only; anything reusable moves to src/
-├── configs/
-│   └── schema.json           # frozen record schema
+│   ├── build_bn_pool.py                      ✅ raw -> interim -> bn_dev_benchmark
+│   ├── build_pilot.py                        ✅ interim -> generated/pilot_v1 (the 500 pairs)
+│   ├── build_agreement_test.py               ✅ pilot_v1 -> annotated/agreement_test_v1
+│   ├── audit.py                              ✅ shortcut probes + structural checks <- THE GATE
+│   ├── generate.py                           ⬜ Step 4 — scaling past the pilot to ~4,000
+│   ├── preprocess.py                         ⬜ Step 6 — Arms A/B/C, formats F1/F2/F3, CMI
+│   ├── train_classical.py                    ⬜ Step 7.1 — N-gram, Skip-gram, BiRNN, BiLSTM
+│   ├── train_transformer.py                  ⬜ Step 7.2 — encoder fine-tuning
+│   ├── further_pretrain.py                   ⬜ Step 8 — MLM further pretraining
+│   └── evaluate.py                           ⬜ Step 12 — metrics, McNemar, bootstrap CI
+├── notebooks/                                 exploratory only; anything reusable moves to src/
+├── configs/schema.json                       ✅ frozen record schema
 ├── results/
-│   ├── experiment_log.csv    # THE single source of truth — every run, including failures
-│   └── tables/               # Tables 1–5
+│   ├── experiment_log.csv                    ✅ every run so far, including audits
+│   └── tables/                               ⬜ Tables 1–5, made at M5/M6
 └── docs/
-    ├── PRD.md
-    ├── IMPLEMENTATION_GUIDE.md
-    └── ANNOTATION_GUIDELINES.md   # written BEFORE annotation begins (R4)
+    ├── PRD.md                                ✅ requirements, gates — the authority
+    ├── IMPLEMENTATION_GUIDE.md               ✅ recipes, hyperparameters
+    └── ANNOTATION_GUIDELINES.md              ✅ written before annotation began (R4)
 ```
 
+**Where you are right now:** M1 is done (`pilot_v1/`). M2 is in progress — the 100-item
+agreement test (`agreement_test_v1/`) is built and waiting for two people to label it.
+
 **Convention:** logic lives in `src/`, notebooks orchestrate and visualise. A notebook cell that
-defines a training loop is a code smell — move it to `src/` and import it.
+defines a training loop is a code smell — move it to `src/` and import it. Every `build_*.py`
+script is deterministic (fixed seed) and re-running it reproduces its output byte-for-byte.
 
 ---
 
@@ -147,7 +170,7 @@ defines a training loop is a code smell — move it to `src/` and import it.
   "question": "…",
   "reference_answer": "…",
   "candidate_answer": "…",
-  "label": 0,
+  "label": 1,
   "hallucination_type": "none | entity | numeric | relational | contradiction | fabricated | overclaim",
   "difficulty": "easy | hard",
   "generator_model": "…",
@@ -161,7 +184,19 @@ defines a training loop is a code smell — move it to `src/` and import it.
 }
 ```
 
-`label`: **`0` = faithful/correct**, **`1` = hallucinated**.
+### Label convention — PROJECT-WIDE, NON-NEGOTIABLE (PRD §5.1a)
+
+```
+label = 1  ->  CORRECT / FAITHFUL     (no hallucination)
+label = 0  ->  INCORRECT / HALLUCINATED
+```
+
+An **is-it-correct?** flag. This matches the ingested source data natively, so **no flip is
+applied anywhere in the pipeline**. `hallucination_type == "none"` exactly when `label == 1`.
+
+The **positive class (1) is faithful**, not hallucinated — the reverse of much of the
+literature. Macro-F1 is unaffected (symmetric under a global flip); per-class precision/recall
+must say which class is meant. `probs[:, 1]` is P(correct).
 
 **Schema is frozen.** Adding a field is allowed; renaming, removing, or repurposing one is not — it
 breaks Phase 2's inheritance. `script_condition`, `cmi`, and `error_span` are Phase 2 payload:
@@ -173,7 +208,7 @@ breaks Phase 2's inheritance. `script_condition`, `cmi`, and `error_span` are Ph
 |---|---|
 | **Intrinsic** (has-context, faithfulness) | `entity`, `numeric`, `relational`, `contradiction` |
 | **Extrinsic** (no-context, factuality) | `fabricated`, `overclaim` |
-| **Negative** | `none` |
+| **Faithful** (`label == 1`) | `none` |
 
 ### 4.3 Corpus composition targets
 
@@ -196,6 +231,29 @@ breaks Phase 2's inheritance. `script_condition`, `cmi`, and `error_span` are Ph
 - **No PII in released data** (D13). Scrub, then manually review.
 - **Splits are deterministic and script-generated** (R6). Never hand-curate a split.
 - **The test set is locked at M0 and opened exactly once, at M6** (E9, RK10). See §8.4.
+
+### 4.5 Current data state — read `data/DATASET_AUDIT.md` before touching data
+
+A 62,084-record QA pool has been ingested. Three facts govern how it may be used:
+
+| Fact | Consequence |
+|---|---|
+| **Source labels already match the project convention** (`1 = correct`) | No flip anywhere. Still load via `data/interim/bn_pool.jsonl` — that stage does the dedup and schema mapping. |
+| **The pool is Bengali script, not Banglish** (0.96% Latin) | It is the *base QA layer* the Banglish condition is generated *from* (guide §3.3), not the Phase 1 corpus. |
+| **A substring rule scores 0.832 macro-F1 on has-context** | Faithful answers are copied verbatim from the context 78.6% of the time. Do not inherit this shortcut when generating the real corpus. |
+
+The PRD's own metadata gate (V1) **passes** on this pool at 0.453–0.506 — notable because the
+pool *was* LLM-constructed, so the classic generation artifact could have been there and isn't.
+
+**Sources:** Bengali Wikipedia (**CC BY-SA 4.0** — attribution + share-alike, so the released
+corpus likely inherits it) and BCS question banks (terms unresolved). QA pairs were built from
+those texts with LLM assistance, recorded per record as `provenance: llm_generated`. Keep that
+field accurate — PRD D7/V4 and Phase 2's synthetic-vs-natural claim both depend on being able to
+separate generated from human-written items. Full register: `data/SOURCES.md`.
+
+`data/splits/bn_dev_benchmark/` is a Bengali-script pipeline-development benchmark. It exists so
+M4 can proceed in parallel with corpus work. **It must never be promoted into `data/splits/`**,
+and any number from it is labelled Bengali-script pipeline validation, not a Phase 1 result.
 
 ---
 
@@ -470,7 +528,7 @@ before any milestone is called complete:
 
 | Check | Asserts |
 |---|---|
-| **Schema validation** | Every record matches `configs/schema.json`; enums hold legal values; `label ∈ {0,1}`; `hallucination_type == "none"` iff `label == 0` |
+| **Schema validation** | Every record matches `configs/schema.json`; enums hold legal values; `label ∈ {0,1}`; `hallucination_type == "none"` iff `label == 1` |
 | **Split integrity** | No `id` in two splits; splits regenerate identically from the seed; test ids match the locked M0 manifest |
 | **Balance verification** | 60/40 condition split; 50/50 class balance ±5%; difficulty ~60/40 |
 | **Length control** | Every generated pair passes `length_ok`; rejection rate logged |

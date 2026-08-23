@@ -1,0 +1,56 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# --- Model checkpoints and training output (large, regenerable) ---
+out/
+fpt_out/
+tb-*/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# --- Secrets. Never commit API keys (PRD D13 / AGENT.md sec 2.3) ---
+.env
+*.key
+kaggle.json
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# DATA POLICY — read before changing
+#
+# Everything under data/ is currently TRACKED on purpose, and it is small
+# enough to stay that way (~120 MB total, largest single file 73 MB).
+#
+# It is tracked because data/SOURCES.md still has two OPEN licence questions:
+#   1. whether the BCS questions came from a redistributable source
+#   2. what licence the released corpus carries (Wikipedia CC BY-SA 4.0
+#      share-alike likely propagates to it)
+#
+# Until BOTH are answered, do not push this repository to a public remote.
+# A private remote is fine. See data/SOURCES.md "Open actions".
+#
+# If the answer turns out to be "not redistributable", uncomment the lines
+# below to untrack the source pool, and keep only the scripts that rebuild it:
+# ---------------------------------------------------------------------------
+# data/raw/bn_qa_pool/*.jsonl
+# data/interim/*.jsonl
+
+# Reviewer working copies of the annotation sheets. The BLANK template and the
+# answer key are tracked; individual annotators' filled-in copies are not, so
+# two people can work in the same clone without colliding.
+data/annotated/agreement_test_v1/items_*.csv
+!data/annotated/agreement_test_v1/items_for_annotation_BLANK.csv
+
+# Scratch
+/tmp/
+scratch/
+*.tmp

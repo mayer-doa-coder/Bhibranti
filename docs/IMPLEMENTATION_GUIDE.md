@@ -82,7 +82,7 @@ Fix this before generating anything. Every record:
 
 ```json
 {
-  "id": "bh_000001",
+  "id": "bh_000001", 
   "source": "BEnQA | NCTB | custom",
   "subject": "physics",
   "level": "SSC | HSC | BCS",
@@ -91,7 +91,7 @@ Fix this before generating anything. Every record:
   "question": "…",
   "reference_answer": "…",
   "candidate_answer": "…",
-  "label": 0,
+  "label": 1,
   "hallucination_type": "none | entity | numeric | relational | fabricated | contradiction",
   "difficulty": "easy | hard",
   "generator_model": "…",
@@ -104,7 +104,28 @@ Fix this before generating anything. Every record:
 }
 ```
 
-`label`: `0` = faithful/correct, `1` = hallucinated.
+### 2.1 Label convention — PROJECT-WIDE, NON-NEGOTIABLE
+
+```
+label = 1  ->  CORRECT / FAITHFUL     (no hallucination)
+label = 0  ->  INCORRECT / HALLUCINATED
+```
+
+Read it as an **is-it-correct?** flag: `1` means yes, `0` means no.
+
+This is the single convention used everywhere — the schema, `data/`, all `src/`
+scripts, every results table, and both documents. It matches the native polarity of
+the ingested `bn_qa_pool` files, so **no flip is applied anywhere in the pipeline**.
+
+Consequences to keep straight:
+
+- The **positive class (1) is faithful**, not hallucinated. Much hallucination-detection
+  literature uses the opposite. When comparing to ViHallu, BanTH, or MedHallu numbers,
+  macro-F1 is unaffected (it is symmetric under a global flip), but **per-class
+  precision/recall are not** — state which class you are quoting.
+- `hallucination_type` is `none` exactly when `label == 1`.
+- In a softmax, `probs[:, 1]` is P(correct). Threshold sweeps select on P(correct).
+- A detector's "detection" is therefore predicting `0`.
 
 Two fields deserve early attention even though they are Phase 2 payload: `script_condition` and `cmi`. Recording them now costs nothing and saves you from rebuilding the corpus later.
 
@@ -264,7 +285,7 @@ Regenerate any pair that fails. Log the rejection rate — if it's above ~20%, y
 - Write an explicit guidelines document *before* annotation begins. BanTH's Appendix B is an excellent template to imitate — it gives per-category definitions with worked bilingual examples.
 - Run a **pilot on 100 items**, compute agreement, resolve disagreements, revise guidelines, *then* annotate the rest.
 - A domain expert (you, or your supervisor) adjudicates disagreements.
-- Annotators label: `label` (0/1), and for label=1, `hallucination_type`.
+- Annotators label: `label` (`1` = correct, `0` = hallucinated), and for **label=0**, `hallucination_type`.
 
 ### 5.2 Inter-annotator agreement
 
@@ -565,6 +586,7 @@ Average the predicted probabilities of your top 3 encoders. Reliably worth 1–3
 
 ```python
 probs = (p_banglishbert + p_muril + p_xlmr) / 3
+# column 1 is P(correct) under this project's convention (1 = correct)
 preds = (probs[:, 1] > threshold).astype(int)
 ```
 
@@ -574,6 +596,7 @@ Never default to 0.5. Sweep on **dev only**:
 ```python
 best_t = max(np.arange(0.2, 0.81, 0.01),
              key=lambda t: f1_score(y_dev, (p_dev[:,1] > t).astype(int), average="macro"))
+# p_dev[:,1] = P(label==1) = P(correct)
 ```
 
 Apply `best_t` to test once. Worth 1–2 points on imbalanced or miscalibrated models.
@@ -750,6 +773,7 @@ Six weeks part-time. Weeks 1–3 are the ones people underestimate — data work
 - [ ] `data/SOURCES.md` created; licence recorded for every source
 - [ ] Kaggle competition rules/licence read and recorded
 - [ ] Data schema (Section 2) frozen and written to `configs/schema.json`
+- [ ] Label convention confirmed everywhere: **1 = correct, 0 = hallucinated** (Section 2.1)
 - [ ] Generation prompt template drafted with length + register constraints
 - [ ] Annotation guidelines document started
 - [ ] Two annotators recruited and briefed

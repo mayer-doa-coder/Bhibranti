@@ -1,0 +1,32 @@
+PILOT BUILD VALIDATION REPORT
+============================================================
+records written:        1,000
+pairs written:          500
+  has-context pairs:    300
+  no-context pairs:     200
+duplicate ids:          0
+schema violations:      0
+leftover Bengali chars: 0
+
+transliteration confidence (per record):
+  high         0
+  medium       0
+  low       1000
+
+has-context subjects:
+  reading_comprehension    90
+  history                  90
+  law                      90
+  others                   30
+
+no-context subjects:
+  mathematics              60
+  science                  36
+  grammar                  27
+  idiom_meaning            23
+  bcs                      22
+  history                  10
+  literature               8
+  antonym                  8
+  vocabulary               5
+  law                      1

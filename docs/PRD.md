@@ -95,17 +95,32 @@ The BenHalluEval group is actively publishing in this exact space (the same auth
 |---|---|---|---|
 | D1 | ≥ 4,000 annotated QA pairs | **Must** | Count in `data/splits/` |
 | D2 | 60/40 has-context / no-context split | Must | Verified by script |
-| D3 | 50/50 class balance (hallucinated/faithful) | Must | ±5% tolerance |
+| D3 | 50/50 class balance (`0` hallucinated / `1` faithful) | Must | ±5% tolerance |
 | D4 | 500-item test set, 100% human-verified, double-annotated | **Must** | Adjudication log exists |
-| D5 | Cohen's/Fleiss' κ ≥ 0.60 on binary label | **Must** | Reported in `results/` |
+| D5 | Cohen's/Fleiss' κ ≥ 0.60 on binary label (§5.1a) | **Must** | Reported in `results/` |
 | D6 | ≥ 500 items with human-written (not generated) Banglish | Should | Provenance field populated |
 | D7 | 100–200 human-written hallucinated answers held out in test | Should | Flagged in test set |
-| D8 | Hallucination type labelled for all positive instances | Must | 6-type taxonomy (§5.2) |
+| D8 | Hallucination type labelled for every hallucinated instance (`label == 0`) | Must | 6-type taxonomy (§5.2) |
 | D9 | Easy/hard difficulty labelled, ~60/40 | Should | Field populated |
 | D10 | Licence recorded for every source | **Must** | `data/SOURCES.md` complete |
 | D11 | `script_condition` and `cmi` fields populated | Should | Phase 2 enabler |
 | D12 | `error_span` captured where available | Could | Phase 2 enabler |
 | D13 | No PII in released data | **Must** | Scrub + manual review |
+
+### 5.1a Label convention — PROJECT-WIDE, NON-NEGOTIABLE
+
+```
+label = 1  ->  CORRECT / FAITHFUL     (no hallucination)
+label = 0  ->  INCORRECT / HALLUCINATED
+```
+
+An **is-it-correct?** flag. `1` = yes, `0` = no. This binding applies to the schema,
+`data/`, every script, every results table, and the implementation guide. It matches
+the ingested source data's native polarity, so no flip is applied anywhere.
+
+Note that the **positive class (1) is therefore faithful, not hallucinated** — the
+reverse of much of the literature. Macro-F1 is unaffected (symmetric under a global
+flip); per-class precision/recall must state which class is meant.
 
 ### 5.2 Taxonomy requirement
 
@@ -113,7 +128,9 @@ The corpus must use the field's existing intrinsic/extrinsic framing (ViHallu, H
 
 **Intrinsic (has-context):** `entity`, `numeric`, `relational`, `contradiction`
 **Extrinsic (no-context):** `fabricated`, `overclaim`
-**Negative class:** `none`
+**Faithful class (`label == 1`):** `none`
+
+`hallucination_type == "none"` exactly when `label == 1`.
 
 ### 5.3 Model requirements
 
@@ -366,4 +383,5 @@ Phase 1's job is to make that claim checkable.
 | **Extrinsic hallucination** | Output contradicting world knowledge with no context provided (a factuality failure) |
 | **FPT** | Further pretraining — continued MLM training of a pretrained encoder on in-domain unlabeled text |
 | **Shortcut / artifact** | A surface feature correlated with the label that lets a model succeed without solving the task |
+| **`label`** | Binary correctness flag. **`1` = correct/faithful, `0` = incorrect/hallucinated** (§5.1a) |
 | **IAA** | Inter-annotator agreement |
