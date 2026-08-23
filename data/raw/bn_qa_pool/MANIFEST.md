@@ -6,7 +6,7 @@ folder. **Never edit these.** Cleaning and schema mapping happen downstream in
 
 Content origin: **Bengali Wikipedia** (CC BY-SA 4.0 — attribution + share-alike) and
 **BCS question banks**. QA pairs were built from those texts with LLM assistance.
-Full register and licence constraints: [`data/SOURCES.md`](../SOURCES.md).
+Full register and licence constraints: [`data/SOURCES.md`](../../SOURCES.md).
 
 Source schema: `{context, prompt_bn, response_bn, label}`.
 

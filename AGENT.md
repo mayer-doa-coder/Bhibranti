@@ -1,4 +1,4 @@
-# AGENT.md — BanglishHallu Phase 1
+# AGENT.md — Phase 1 (Bengali)
 
 > Context and operating instructions for AI agents working in this repository.
 > Source of truth: [docs/PRD.md](docs/PRD.md) and [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md).
@@ -8,31 +8,43 @@
 
 ## 1. Project overview
 
-**BanglishHallu** builds a **hallucination detector for Bangla–English code-mixed text
-("Banglish")** — romanised Bangla with interleaved English — in the educational domain
-(BCS / SSC / HSC question answering).
+This project builds a **hallucination detector for Bengali question answering** in the
+educational domain (BCS / SSC / HSC).
 
-The work is split into two phases. **This repository is Phase 1 only.**
+**Phase 1 — this repository — is Bengali only.** Bangla script in, Bangla script out. There is
+no Banglish anywhere in Phase 1.
 
 | Phase | Deliverable |
 |---|---|
-| **Phase 1 (here)** | A validated, human-annotated corpus + a benchmarked model ladder + a working detector |
-| Phase 2 (later) | Causal analysis of *how* code-mixing degrades detection; the publishable paper |
+| **Phase 1 (here)** | A filtered, annotated **Bengali** corpus + a benchmarked model ladder + a working detector |
+| Phase 2 (later) | The **Banglish** (romanised Bangla) study: same pipeline, code-mixed input, and how code-mixing degrades detection |
+
+> The project originally started with Banglish and had to restart. A rule-based transliteration
+> produced text a native speaker could not read, and the pilot built on it was discarded. Phase 2
+> must use a real transliteration model, and a native speaker must read every batch before any
+> annotation is built on it. See PRD §14.1.
 
 ### 1.1 Core objectives (PRD §3.1)
 
 | ID | Goal |
 |---|---|
-| G1 | Human-annotated Banglish hallucination corpus, **≥ 4,000 QA pairs** |
+| G1 | Human-annotated **Bengali** hallucination corpus, **≥ 4,000 QA pairs** — built (4,480) |
 | G2 | Cover both **grounded (has-context)** and **closed-book (no-context)** conditions |
 | G3 | Benchmark a full model ladder: lexical → embedding → recurrent → pretrained-contextual |
-| G4 | **macro-F1 ≥ 0.80 has-context**, **≥ 0.60 no-context** |
+| G4 | **macro-F1 ≥ 0.80 on the has-context HARD subset**, **≥ 0.60 no-context** |
 | G5 | Pass the **shortcut audit** (corpus validity gate) |
 | G6 | Reproducible pipeline + complete experiment log |
 
 ### 1.2 The single most important rule
 
 > **A high score on an artifacted corpus is a failed deliverable.**
+>
+> **And a has-context score reported without its string-matcher baseline is not a result.**
+> The rule "if the answer appears in the passage, call it correct" already scores **0.812** on
+> all has-context items, and **0.456** on the hard subset. Quote both, every time.
+>
+> **RAG is forbidden.** No retrieval at inference of any kind — see PRD §5.3a. **The corpus is
+> final:** do not collect or generate more data. **QA only:** no fill-in-the-blank / cloze items.
 
 The metadata-only shortcut probe (§7) is a **blocking release gate**. Any agent that raises a score
 by weakening, skipping, or reinterpreting that gate has actively damaged the project. Corpus
@@ -45,6 +57,9 @@ validity outranks every metric on every table.
   requirement (this is also a course deliverable that must demonstrate N-gram, Skip-gram, RNN,
   LSTM, and BERT). Substituting a "better" model for a required one is a regression, not an
   improvement.
+- Do **not** use RAG or any inference-time retrieval (PRD §5.3a).
+- Do **not** collect or generate more data — the corpus is final.
+- Do **not** add fill-in-the-blank items — QA only; cloze is a different task.
 - Do **not** start Phase 2 work. See §11.
 
 ---
@@ -99,61 +114,55 @@ direction used by Arm B.
 
 ## 3. Repository structure
 
-**This is the ACTUAL current tree, not just the plan.** ✅ = exists and works today.
-⬜ = not built yet. Follow the arrows below for the order things get built in.
+**This is the ACTUAL tree, not a plan.** OK = exists and works today. TODO = not built yet.
 
 ```
-banglishhallu/
-├── data/
-│   ├── raw/bn_qa_pool/                       ✅ 14 source files, verbatim, 62,084 records
-│   │   └── MANIFEST.md                       ✅ per-file checksums + licence pointer
-│   ├── interim/bn_pool.jsonl                 ✅ 56,480 cleaned + schema-mapped records
-│   ├── generated/                            <- Banglish drafts live here
-│   │   └── pilot_v1/                         ✅ 500 pairs, M1 gate PASSES (0.505)
-│   │       ├── pilot.jsonl                       the 1,000 schema records
-│   │       ├── review_sheet.csv                  <- open this to do Task 3 (your read-through)
-│   │       ├── selection_log.csv
-│   │       └── validation_report.txt
-│   ├── annotated/                            <- human-labeled data lives here
-│   │   └── agreement_test_v1/                ✅ the 100-item M2 guideline check
-│   │       ├── items_for_annotation_BLANK.csv    <- open this to do the annotation test
-│   │       ├── answer_key_DO_NOT_OPEN_YET.csv    <- don't touch until both annotators finish
-│   │       └── selection_log.csv
-│   ├── splits/
-│   │   ├── bn_dev_benchmark/                 ✅ Bengali-script pipeline sandbox (3112/531/538)
-│   │   └── train.jsonl / dev.jsonl / test.jsonl  ⬜ the REAL locked splits — made at M3
-│   ├── DATASET_AUDIT.md                      ✅ read this first, before touching data/
-│   └── SOURCES.md                            ✅ licence register (2 questions still open)
-├── src/
-│   ├── build_bn_pool.py                      ✅ raw -> interim -> bn_dev_benchmark
-│   ├── build_pilot.py                        ✅ interim -> generated/pilot_v1 (the 500 pairs)
-│   ├── build_agreement_test.py               ✅ pilot_v1 -> annotated/agreement_test_v1
-│   ├── audit.py                              ✅ shortcut probes + structural checks <- THE GATE
-│   ├── generate.py                           ⬜ Step 4 — scaling past the pilot to ~4,000
-│   ├── preprocess.py                         ⬜ Step 6 — Arms A/B/C, formats F1/F2/F3, CMI
-│   ├── train_classical.py                    ⬜ Step 7.1 — N-gram, Skip-gram, BiRNN, BiLSTM
-│   ├── train_transformer.py                  ⬜ Step 7.2 — encoder fine-tuning
-│   ├── further_pretrain.py                   ⬜ Step 8 — MLM further pretraining
-│   └── evaluate.py                           ⬜ Step 12 — metrics, McNemar, bootstrap CI
-├── notebooks/                                 exploratory only; anything reusable moves to src/
-├── configs/schema.json                       ✅ frozen record schema
-├── results/
-│   ├── experiment_log.csv                    ✅ every run so far, including audits
-│   └── tables/                               ⬜ Tables 1–5, made at M5/M6
-└── docs/
-    ├── PRD.md                                ✅ requirements, gates — the authority
-    ├── IMPLEMENTATION_GUIDE.md               ✅ recipes, hyperparameters
-    └── ANNOTATION_GUIDELINES.md              ✅ written before annotation began (R4)
+project/
+|-- data/
+|   |-- raw/bn_qa_pool/                    OK   14 source .jsonl, verbatim, 62,084 records
+|   |   \-- MANIFEST.md                    OK   per-file checksums + licence pointer
+|   |-- interim/bn_pool.jsonl              OK   56,480 cleaned records (unfiltered pool)
+|   |-- corpus/bn_v1/corpus.jsonl          OK   THE CORPUS - 4,480 pairs / 8,960 records
+|   |-- splits/                            OK   the locked splits
+|   |   |-- train.jsonl  dev.jsonl  test.jsonl      3,129 / 673 / 678 pairs
+|   |   \-- _pool_sanity/                  OK   throwaway, git-ignored, never train on it
+|   |-- annotated/agreement_test_v1/       OK   100 blind items for the M2 kappa check
+|   |   |-- items_for_annotation_BLANK.csv      <- copy twice, one per annotator
+|   |   \-- answer_key_DO_NOT_OPEN_YET.csv      <- opened only after both submit
+|   |-- DATASET_AUDIT.md                   OK   read before touching data/
+|   \-- SOURCES.md                         OK   licence register (open questions remain)
+|-- src/
+|   |-- build_bn_pool.py                   OK   raw -> interim
+|   |-- build_corpus.py                    OK   pairs, filters, splits
+|   |-- build_agreement_test.py            OK   corpus -> 100-item blind test
+|   |-- score_agreement.py                 OK   Cohen's kappa, the M2 gate
+|   |-- build_annotation_sheets.py       OK   M3 sheets (6 documented guards)
+|   |-- validate_annotation.py           OK   checks filled sheets before merge
+|   |-- audit.py                           OK   shortcut probes  <- THE BLOCKING GATE
+|   |-- preprocess.py                      TODO input formats F1/F2/F3
+|   |-- train_classical.py                 TODO N-gram, Skip-gram, BiRNN, BiLSTM
+|   |-- train_transformer.py               TODO encoder fine-tuning
+|   |-- further_pretrain.py                TODO MLM further pretraining (mBERT / XLM-R only)
+|   \-- evaluate.py                        TODO metrics, McNemar, bootstrap CI
+|-- notebooks/                             exploratory only; reusable code moves to src/
+|-- configs/schema.json                    OK   frozen record schema
+|-- results/
+|   |-- experiment_log.csv                 OK   every run, including failures
+|   \-- tables/                            TODO Tables 1-5, produced at M5/M6
+\-- docs/
+    |-- PRD.md                             OK   requirements and gates - the authority
+    |-- IMPLEMENTATION_GUIDE.md            OK   recipes and hyperparameters
+    \-- ANNOTATION_GUIDELINES.md           OK   written before annotation began (R4)
 ```
 
-**Where you are right now:** M1 is done (`pilot_v1/`). M2 is in progress — the 100-item
-agreement test (`agreement_test_v1/`) is built and waiting for two people to label it.
+**Where the project is right now:** M1 done (corpus built, gate passing at 0.534).
+**M2 PASSED** - kappa = 0.717 on 100 blind items (see agreement_test_v1/IAA_REPORT.md).
+**M3 is the current gate** - sheets are built in `data/annotated/round1/`; 5,310 judgements
+remain before `hallucination_type` stops being 'unlabeled'.
 
 **Convention:** logic lives in `src/`, notebooks orchestrate and visualise. A notebook cell that
-defines a training loop is a code smell — move it to `src/` and import it. Every `build_*.py`
-script is deterministic (fixed seed) and re-running it reproduces its output byte-for-byte.
-
----
+defines a training loop is a code smell - move it to `src/` and import it. Every `build_*.py` is
+deterministic at seed 42 and reproduces byte-identical output.
 
 ## 4. Data contract
 
@@ -178,7 +187,7 @@ script is deterministic (fixed seed) and re-running it reproduces its output byt
   "annotator_1": 0,
   "annotator_2": 0,
   "adjudicated": false,
-  "script_condition": "banglish",
+  "script_condition": "bengali",
   "cmi": 0.42,
   "error_span": "…"
 }
@@ -219,7 +228,7 @@ breaks Phase 2's inheritance. `script_condition`, `cmi`, and `error_span` are Ph
 | hallucinated / faithful | 50 / 50 | ±5% |
 | easy / hard | ~60 / 40 | — |
 | Train / Dev / Test | 3,000 / 500 / 500 | — |
-| Human-written Banglish items | ≥ 500 | — |
+| Hard items (string shortcut does not work) | report always | 800 has-ctx / 332 no-ctx |
 | Human-written hallucinated answers held out in **test** | 100–200 | flagged |
 
 ### 4.4 Non-negotiable data rules
@@ -239,8 +248,8 @@ A 62,084-record QA pool has been ingested. Three facts govern how it may be used
 | Fact | Consequence |
 |---|---|
 | **Source labels already match the project convention** (`1 = correct`) | No flip anywhere. Still load via `data/interim/bn_pool.jsonl` — that stage does the dedup and schema mapping. |
-| **The pool is Bengali script, not Banglish** (0.96% Latin) | It is the *base QA layer* the Banglish condition is generated *from* (guide §3.3), not the Phase 1 corpus. |
-| **A substring rule scores 0.832 macro-F1 on has-context** | Faithful answers are copied verbatim from the context 78.6% of the time. Do not inherit this shortcut when generating the real corpus. |
+| **The pool is Bengali script** (0.96% Latin) | Correct and expected — Phase 1 is Bengali. `src/build_corpus.py` filters it to the 4,480-pair corpus. |
+| **A substring rule scores 0.812 macro-F1 on has-context** | Correct answers are verbatim spans of the passage far more often than wrong ones. Handled by the `difficulty` field, not by deletion: on the **hard** subset the same rule scores 0.456. Always report both. |
 
 The PRD's own metadata gate (V1) **passes** on this pool at 0.453–0.506 — notable because the
 pool *was* LLM-constructed, so the classic generation artifact could have been there and isn't.
@@ -251,11 +260,12 @@ those texts with LLM assistance, recorded per record as `provenance: llm_generat
 field accurate — PRD D7/V4 and Phase 2's synthetic-vs-natural claim both depend on being able to
 separate generated from human-written items. Full register: `data/SOURCES.md`.
 
-`data/splits/bn_dev_benchmark/` is a Bengali-script pipeline-development benchmark. It exists so
-M4 can proceed in parallel with corpus work. **It must never be promoted into `data/splits/`**,
-and any number from it is labelled Bengali-script pipeline validation, not a Phase 1 result.
+`data/splits/{train,dev,test}.jsonl` are the real Phase 1 splits, built by
+`src/build_corpus.py` from `data/corpus/bn_v1/corpus.jsonl`. They are Bengali script,
+answerability-filtered, grouped by pair, and deterministic at seed 42.
 
----
+`data/splits/_pool_sanity/` is a throwaway artifact of `build_bn_pool.py`, used only to
+check that script still runs. It is git-ignored. Never train on it and never report from it.
 
 ## 5. Generation protocol
 
@@ -295,11 +305,11 @@ Build **three arms** and **three formats**; sweep all 9 on the best model (highe
 | Arm | Definition |
 |---|---|
 | **A — Raw** | As-is. Strip URLs, collapse whitespace, remove PII. |
-| **B — Normalised** | Back-transliterate Banglish → Bengali script, then csebuetnlp `normalize()`. |
-| **C — Dual** | `banglish [SEP] bengali_script` — both views concatenated. |
+| **B — Normalised** | Apply csebuetnlp `normalize()` to the Bengali text. Required for BanglaBERT. |
+| ~~C — Dual~~ | **Phase 2 only.** There is no second script view in Phase 1. |
 
 > **Caveat:** csebuetnlp `normalize()` is built for **Bengali script**. Apply it *after*
-> back-transliteration, never directly to Latin-script Banglish. For BanglaBERT/BanglishBERT it is
+> Bengali script, which is all of Phase 1. For BanglaBERT it is
 > **required** — skipping it degrades results, because those models were pretrained with it.
 
 | Format | Template |
@@ -362,13 +372,13 @@ dropping features, or re-splitting until it passes.
 | **M1 N-gram** | TF-IDF (word 1–2 grams + char 3–5 grams) → LogReg, LinearSVC. Log **OOV rate**. |
 | **M2 Skip-gram** | gensim Word2Vec `sg=1, dim=200, window=5, min_count=2`, averaged → LogReg, XGBoost. Log **vocab coverage**. |
 | **M3 Recurrent** | BiRNN (1×256), BiLSTM (2×256, dropout 0.3), BiLSTM + additive attention. Skip-gram init. |
-| **M4/M5 Encoders** | ≥ 5 fine-tuned, **must include `csebuetnlp/banglishbert` and `google/muril-base-cased`** |
+| **M4/M5 Encoders** | ≥ 5 fine-tuned, **must include `csebuetnlp/banglabert` and `google/muril-base-cased`** |
 
-Encoder pool: `csebuetnlp/banglishbert` (ELECTRA discriminator, needs the normaliser),
+Encoder pool: `csebuetnlp/banglabert` (ELECTRA discriminator, needs the normaliser; primary for Phase 1),
 `csebuetnlp/banglabert`, `google/muril-base-cased`, `xlm-roberta-base`,
 `bert-base-multilingual-cased`, `ai4bharat/IndicBERTv2-MLM-only`, Mixed-Distil-BERT.
 
-Char n-grams matter disproportionately here: Banglish spelling variance fragments word-level
+Char n-grams matter disproportionately here: Bangla inflection and compounding fragment word-level
 features, and character features partially recover it.
 
 BanTH's spread across seven very different encoders was **2.8 points** (77.35 → 74.51). **Do not
@@ -386,7 +396,7 @@ early stopping on validation loss (patience 2), metric_for_best_model="macro_f1"
 ### 8.3 Further pretraining (highest-leverage single step)
 
 MLM, 15% masking, `lr=1e-5`, batch 32, 5 epochs, on unlabeled transliterated Bangla
-(**BanglaTLit-PT**, 243K texts; supplement with BanglishRev, MixSarc).
+(Phase 1: unlabeled Bengali text. BanglaTLit-PT / BanglishRev / MixSarc are **Phase 2** corpora.)
 
 > **ELECTRA warning:** BanglaBERT and BanglishBERT are ELECTRA *discriminators*.
 > `AutoModelForMaskedLM` will **not** load them cleanly. Use the paired generator checkpoint
@@ -542,7 +552,7 @@ validation, split integrity, balance, and the shortcut probe.
 
 ---
 
-## 11. Scope boundary — Phase 2 is off-limits
+## 11. Scope boundary — Phase 2 (Banglish) is off-limits
 
 RK9 is a **high-likelihood** risk: Phase 2's experiments are more interesting than Phase 1's, and the
 pull to start them early is real. Resist it. A half-built corpus with half-built experiments delivers

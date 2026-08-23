@@ -22,13 +22,17 @@ on `pair_id`**; splitting a pair across train and test turns the task into memor
 
 ## What this is not
 
-This is **Bengali script, not Banglish** — 0.96% Latin characters. It is the base QA layer that
-the Banglish condition gets produced *from* (guide §3.3), not the Phase 1 corpus. Fields reflect
+This is **Bengali script** — 0.96% Latin characters — which is exactly what Phase 1 needs.
+
+It is the **whole** pool, not the corpus. `src/build_corpus.py` pairs it, drops only invalid
+records, and applies the 60/40 and per-subject composition constraints to produce
+`data/corpus/bn_v1/corpus.jsonl` (4,480 pairs). Use that for anything that trains or
+evaluates. Fields reflect
 that honestly:
 
 - `script_condition: "bengali_script"`
 - `cmi` computed by a **script proxy** and ≈ 0 throughout; recompute with real token-level
-  language ID once Banglish text exists
+  language ID in Phase 2, once Banglish text exists
 - `hallucination_type: "unlabeled"` on positives — provisional, never ship it
 - `difficulty: "unlabeled"`, `annotator_1/2: null`
 

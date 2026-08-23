@@ -1,101 +1,101 @@
-﻿item_id,condition,true_label,true_label_word,true_type_guess,source_pair_id,bn_question,bn_answer
-item_001,no_context,1,correct,none,pilot_000323,বাংলাদেশ সংবিধানের কোন অনুচ্ছেদে নারী-পুরুষের সমতা নিশ্চিত করা হয়েছে?,২৮ (২)
-item_002,has_context,1,correct,none,pilot_000403,"প্রদত্ত প্রসঙ্গ অনুযায়ী রাজস্ব বিক্রয় আইন, ১৭৯৩ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",কর আদায়কারী এজেন্ট হিসেবে জমিদারগণ এবং উত্তরাধিকারসূত্রে জমির দখলদার হিসেবে রায়তদের মধ্যকার সম্বন্ধ একটি নতুন সম্পর্ক দ্বারা প্রতিস্থাপিত হয়েছিল।
-item_003,has_context,1,correct,none,pilot_000204,প্রদত্ত প্রসঙ্গ অনুযায়ী ভারতীয় রাষ্ট্রব্যবস্থায় রাজ্যসভার ভূমিকা সম্পর্কে কী তথ্য দেওয়া হয়েছে?,"দারিদ্র্য, নিরক্ষরতা, দুর্বল স্বাস্থ্য পরিষেবা, শিল্পায়ন ও আর্থিক উন্নয়নের নিম্নগতি, সামাজিক রক্ষণশীলতা, পরিকাঠামোর অভাব ও বেকারত্বের মতো বিভিন্ন নেতিবাচক সমস্যাগুলি থেকে মুক্তির লক্ষ্যে রাজ্যসভার ভূমিকার প্রসঙ্গ উল্লেখ করে শ্রী নাইডু বলেন, দেশের আর্থিক বিকাশে উচ্চকক্ষ এখন চালিকাশক্তির ভূমিকা নিয়েছে।"
-item_004,has_context,0,wrong,relational,pilot_000190,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৪ সম্পর্কে কী বলা হয়েছে?",এই আইনের অধীন উপজেলা পরিষদের প্রতিটি ওয়ার্ডে একটি ওয়ার্ড সভা গঠন করিতে হইবে।
-item_005,has_context,0,wrong,numeric,pilot_000023,আন্দ্রেয়া জেনকিন্স কবে জন্মগ্রহণ করেন?,১৬ জুন ২০১৯
-item_006,has_context,0,wrong,relational,pilot_000210,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ২৪ সম্পর্কে কী বলা হয়েছে?","তবে শর্ত থাকে যে, নির্বাচনী দরখাস্ত যে ট্রাইব্যুনালে বদলী করা হইয়াছে সেই ট্রাইব্যুনাল উপযুক্ত মনে করিলে ইতিপূর্বে পরীক্ষিত কোন সাক্ষী পুনরায় তলব বা পুনরায় পরীক্ষা করিতে পারিবে এবং অনুরূপভাবে আপিল ট্রাইব্যুনালও এই ক্ষমতা প্রয়োগ করিতে পারিবে না।"
-item_007,has_context,1,correct,none,pilot_000393,প্রদত্ত প্রসঙ্গ অনুযায়ী ভারতীয় রাষ্ট্রব্যবস্থায় রাজ্যসভার ভূমিকা সম্পর্কে কী তথ্য দেওয়া হয়েছে?,বিভিন্ন গুরুত্বপূর্ণ বিষয় নিয়ে আলোচনার জন্য প্রাপ্ত সময় বিবেচনা করে বর্তমানে প্রতি বছর যে ৬০-৭০ দিন অধিবেশন চলে তার পর্যাপ্ততা যথাযথ কিনা।
-item_008,no_context,1,correct,none,pilot_000282,রাজা দোকানে গিয়ে ৩ টাকা ২৫ পয়সার জিরে এবং ১ টাকা ২৫ পয়সার কালো জিরে কিনল । রাজা কত টাকার জিনিস কিনল ?,4.5
-item_009,has_context,1,correct,none,pilot_000147,পাল বংশের সর্বশেষ রাজা কে ছিলেন ?,পাল বংশের সর্বশেষ রাজা ছিলেন মদনপাল।
-item_010,has_context,1,correct,none,pilot_000025,শেখ মুজিবের পক্ষে বাংলাদেশের স্বাধীনতার আনুষ্ঠানিক ঘোষণা কে দেন?,মেজর জিয়াউর রহমান
-item_011,has_context,1,correct,none,pilot_000286,মাধানাত আল-ঘারবিয়্যা মিনারটি অন্য কী নামে পরিচিত?,মিনার অব কাইতবাই
-item_012,no_context,0,wrong,fabricated,pilot_000196,গবলিন হাঙরের প্রথম নমুনার সংগ্রাহক কে ছিলেন?,ড. মেঘনাদ সাহা
-item_013,has_context,0,wrong,relational,pilot_000200,অনুচ্ছেদের ভিত্তিতে “কোনও কারণে অধ্যাপকের অনুপস্থিতিতে ক্লাশে” বিষয়ে কোন বক্তব্যটি সঠিক?,কোনও কারণে অধ্যাপকের অনুপস্থিতিতে ক্লাশে শিক্ষাদান যাতে ব্যাহত না হয় সেদিকে অধ্যক্ষ মাখন লাল নাগের প্রখর দৃষ্টি ছিল না ।
-item_014,no_context,0,wrong,fabricated,pilot_000322,"রেজার পিগি ব্যাঙ্কে কিছু টাকা আছে। তিনি প্রতিবার দোকানে ২ টাকা খরচ করেন। তিনি প্রতি মাসে ৪টি দোকানে যান। যদি এক বছর পর তার পিগি ব্যাঙ্কে তার ৳১০৪ টাকা অবশিষ্ট থাকে, তবে প্রথমে তার কাছে কত টাকা টাকা ছিল?",১৭৩
-item_015,no_context,0,wrong,fabricated,pilot_000199,রঞ্জন চরিত্রটি রবীন্দ্রনাথ ঠাকুরের কোন নাটকের?,মুক্তধারা
-item_016,has_context,0,wrong,relational,pilot_000060,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",পরবর্তী সময়ে এর সঙ্গে যোগ হয় পুলিশ বাহিনী নামে একটি সামরিক শাখা।
-item_017,has_context,0,wrong,relational,pilot_000150,সমাজতত্ত্ব-এর জনক কাকে বলা হয় ?,অঙ্কিত কোৎ
-item_018,has_context,0,wrong,relational,pilot_000330,"প্রদত্ত প্রসঙ্গ অনুযায়ী রাজস্ব বিক্রয় আইন, ১৭৯৩ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",চিরস্থায়ী বন্দোবস্ত আইনে রায়তদের ওপর নির্ধারিত রাজস্ব দাবি সরকার কর্তৃক বৃদ্ধিকরণ স্থায়িভাবে নিষিদ্ধ করা হয়।
-item_019,no_context,0,wrong,fabricated,pilot_000265,'ঋণমুক্ত' শব্দের ব্যাসবাক্য কোনটি?,ঋণ দ্বারা মুক্ত
-item_020,has_context,1,correct,none,pilot_000144,পাল যুগে রচিত ‘আগম শাস্ত্র’ গ্রন্থের রচয়িতা কে?,গৌড়পাদ।
-item_021,no_context,1,correct,none,pilot_000342,বাংলাদেশের পানি সম্পদের চাহিদা সবচেয়ে বেশি কোন খাতে?,কৃষি
-item_022,no_context,1,correct,none,pilot_000434,NSEC এর ডিপার্টমেন্ট অফ ইলেকট্রনিক্স ইঞ্জিনিয়ারিং কত সালে প্রতিষ্ঠিত হয়?,১৯৯৮ সালে
-item_023,no_context,1,correct,none,pilot_000109,'বন্য' শব্দের চলিত রূপ কোনটি?,বুনো
-item_024,has_context,0,wrong,relational,pilot_000497,লাভ-ক্ষতির বিচার কোন ধরনের মূল্যবোধের সঙ্গে সম্পর্কিত?,নৈতিক মূল্যবোধ।
-item_025,no_context,0,wrong,fabricated,pilot_000357,‘বিপদ’ ও ‘ছায়া’ শব্দ দুটির সন্ধিতে কোন শব্দ গঠিত হয়?,বিপদছায়া
-item_026,no_context,1,correct,none,pilot_000463,"""নাক সিঁটকানো"" এর ভাবার্থ কী?",ঘৃণায় অবজ্ঞা প্রকাশ করা
-item_027,has_context,1,correct,none,pilot_000125,পাঠ্যাংশে “রিচার্ড করবেট যখন নেতা তখন” কীভাবে বর্ণিত হয়েছে?,"রিচার্ড করবেট যখন নেতা ছিলেন তখন তিনি ইউরোপীয় পার্লামেন্টারি লেবার পার্টির ডেপুটি লিডার ছিলেন এবং ২০১৯ থেকে ২০২০ সাল পর্যন্ত পরিবেশ, জনস্বাস্থ্য এবং খাদ্য সুরক্ষা সম্পর্কিত ইউরোপীয় সংসদ কমিটির ভাইস-চেয়ার ছিলেন।"
-item_028,no_context,1,correct,none,pilot_000486,বইমেলায় নিয়ে যাওয়ার জন্য সেলিম এর  কাছে ৳২০ ছিল। তিনি একটি বই ৮ টাকায় এবং অন্যটি ৪ টাকায় কিনেছিলেন। তিনি তার অবশিষ্ট টাকা দিয়ে যতটা সম্ভব ৪ টাকা মূল্যের পোস্টার কেনার সিদ্ধান্ত নিয়েছে। তিনি কতগুলো পোস্টার কিনতে পারেন?,২
-item_029,no_context,0,wrong,fabricated,pilot_000419,জহির রায়হান কবে নিখোঁজ হন?,২০০৮ সালের ১৪ জানুয়ারি
-item_030,has_context,1,correct,none,pilot_000031,গুপ্ত সাম্রাজ্যের পতন কবে হয় ?,ষষ্ঠ শতাব্দী
-item_031,has_context,1,correct,none,pilot_000333,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",২৪ তম ডিভিশনের জিওসি ছিলেন উন্নয়ন বোর্ডের চেয়ারম্যান এবং এর ব্যবস্থাপনা অনেকটা ছিল বাঙালিদের হাতে।
-item_032,has_context,1,correct,none,pilot_000338,প্রীতি জিনতার স্বামীর নাম কী ?,জিন গুডএনাফ।
-item_033,has_context,0,wrong,numeric,pilot_000489,প্রদত্ত প্রসঙ্গ অনুযায়ী বাংলাদেশের বিচারব্যবস্থার ঐতিহাসিক বিকাশ সম্পর্কে কী বলা হয়েছে?,"ইন্ডিয়ান হাই কোর্টস অ্যাক্ট, ১৮৬২ প্রেসিডেন্সি শহরগুলোর পৃথক আদালতব্যবস্থার পরিবর্তে হাই কোর্ট প্রতিষ্ঠা করে।"
-item_034,no_context,1,correct,none,pilot_000374,‘স্বেচ্ছা’ শব্দের সন্ধি বিচ্ছেদ কী?,স্ব + ইচ্ছা
-item_035,has_context,0,wrong,relational,pilot_000205,১৯৩৪-৩৫ সফরের মাধ্যমে ক্রিকেট ইতিহাসে কী প্রথমবার সংঘটিত হয়?,প্রথম পুরুষ টেস্ট ম্যাচ
-item_036,no_context,0,wrong,fabricated,pilot_000462,সন্ধির বিসর্গ লোপ হয় কোন সন্ধিটিতে?,শিরঃ + পীড়া
-item_037,has_context,0,wrong,numeric,pilot_000114,রাজীব গান্ধী কবে মৃত্যুবরণ করেন?,২০ মে ১৯৯১।
-item_038,has_context,0,wrong,numeric,pilot_000315,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",সরকার ১৯৮০ সালে ঐ অঞ্চলে বাঙালি বসতি স্থাপনের এক কর্মসূচি গ্রহণ করে।
-item_039,no_context,1,correct,none,pilot_000152,উনিশ শতকের আগে মন সম্পর্কীয় সকল অধ্যয়ন কোন বিষয়ের অন্তর্ভুক্ত ছিল?,দর্শন
-item_040,no_context,0,wrong,fabricated,pilot_000325,জিদান প্রতিদিন  একটা বই পড়ে। তিনি প্রতিদিন ২ ঘন্টা বই  পড়েন এবং প্রতি ঘন্টায় ৫০ পৃষ্ঠা বই পড়েন। বইটি যদি ২৮০০ পৃষ্ঠার হয় তবে তার পুরো বইটি  পড়তে কত সপ্তাহ লাগবে?,২
-item_041,has_context,0,wrong,relational,pilot_000166,প্রদত্ত প্রসঙ্গ অনুযায়ী রাজবাড়ী জেলা বিচার বিভাগের ইতিহাস সম্পর্কে কী তথ্য দেওয়া হয়েছে?,পূর্বেই এই আদালত রাজবাড়ী সদর উপজেলা এবং গোয়ালন্দ উপজেলায় মাঝামাঝিন ছোট ভাকলা নামক স্থানে গোয়ালন্দ মুন্সেফি আদালত নামে এবং মূল রাজবাড়ী বৃহত্তর ফরিদপুর জেলার অংশ হিসাবে সরকারি নথিপত্রে অন্তর্ভুক্ত ছিল না।
-item_042,has_context,1,correct,none,pilot_000490,২০১২ এশিয়া কাপের ফাইনালে বাংলাদেশ কোন দেশের কাছে হেরে যায় ও কত রানে?,পাকিস্তানের কাছে মাত্র ২ রানে
-item_043,no_context,1,correct,none,pilot_000269,"$\triangle ABC$ র বাহুAB = 5, BC = 3, CA = 4। Bবিন্দুকে স্থির রেখে ত্রিভুজকেঘুরালেতা যে জায়গা দখল করবে তার ক্ষেত্রফলaাহলে $a$ কত?",9
-item_044,has_context,0,wrong,numeric,pilot_000352,২৬৩ কি মৌলিক সংখ্যা?,"না, ২৬৩ যৌগিক।"
-item_045,has_context,1,correct,none,pilot_000052,শায়েস্তা খাঁ কোন বছর তার কন্যার মৃত্যুর কারণে নির্মাণ বন্ধ রাখেন?,১৬৮৪ সালে
-item_046,has_context,0,wrong,relational,pilot_000448,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৬২ সম্পর্কে কী বলা হয়েছে?","প্রত্যেক উপজেলা পরিষদের একজন সচিব, একজন হিসাব সহকারী-কাম-কম্পিউটার অপারেটর থাকিবেন, যাহারা সরকার বা সরকার কর্তৃক নির্ধারিত কোন কর্তৃপক্ষের মাধ্যমে নিযুক্ত হইবেন।"
-item_047,no_context,0,wrong,fabricated,pilot_000073,“সংবাদ” শব্দের সন্ধিবিচ্ছেদ কী?,সঃ + বাদ
-item_048,no_context,0,wrong,fabricated,pilot_000450,যৌগিক শব্দ নয় কোনটি?,দৌহিত্র
-item_049,no_context,1,correct,none,pilot_000329,"স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৫১-এর বিষয় কী?","পরিষদের সম্পত্তি অর্জন, দখলে রাখিবার ও নিষ্পত্তি করিবার ক্ষমতা"
-item_050,has_context,0,wrong,relational,pilot_000279,নাজিমুদ্দিনের ঘোষণার প্রতিবাদে ২৮ জানুয়ারি ১৯৫২ সালে কে বিক্ষোভ সমাবেশের আয়োজন করে?,সর্বদলীয় রাষ্ট্রভাষা সংগ্রাম পরিষদ
-item_051,no_context,0,wrong,fabricated,pilot_000304,বাণিজ্যিকভাবে গুরুত্বপূর্ণ কোন কোন রাসায়নিক পদার্থ জৈবিক পদ্ধতিতে অণুজীব দ্বারা উৎপাদন করা সাশ্রয়ী?,"গ্লুকোজ, সুক্রোজ ও ফ্রুক্টোজ"
-item_052,no_context,1,correct,none,pilot_000432,"একটি 3 অঙ্কের সংখ্যা abc কে ""বৃদ্ধিশীল"" বলা হবে যদি এবং কেবল যদি a < b < c হয়। যেখানে a একটি অশূন্য অঙ্ক। একটা 3 অঙ্কের সংখ্যা abc কে ""হ্রাসমান"" বলা হবে যদি এবং কেবল যদি a > b > c হয়। যদি ""হ্রাসমান"" সংখ্যার সংখ্যা x আর ""বৃদ্ধিশীল"" সংখ্যার সংখ্যা y হয়, তাহলে x আর y এর পার্থক্য কত?",0
-item_053,has_context,1,correct,none,pilot_000378,প্রদত্ত প্রসঙ্গ অনুযায়ী ভারতীয় রাষ্ট্রব্যবস্থায় রাজ্যসভার ভূমিকা সম্পর্কে কী তথ্য দেওয়া হয়েছে?,"তিনি বলেন, ১৯৫২-র ১৩ মে থেকে ২৪৯তম অধিবেশন পর্যন্ত ৩, ৮১৭টি বিল পাস করা হয়েছে।"
-item_054,has_context,1,correct,none,pilot_000483,আওয়ামী মুসলিম লীগ কবে গঠিত হয়?,২৩ জুন ১৯৪৯
-item_055,no_context,0,wrong,fabricated,pilot_000251,জগদীশচন্দ্র বসু কোন সালে ক্রিস্টাল ডায়োড ব্যবহার করে রেডিও সংকেত পুনরুদ্ধার করতে সক্ষম হন?,৯৬৪ সালে
-item_056,has_context,1,correct,none,pilot_000391,ঢাকা বিশ্ববিদ্যালয় কবে শতবর্ষে পা দেয়?,২০২০ সালের ১লা জুলাই
-item_057,has_context,0,wrong,relational,pilot_000292,উমাইয়া রাজবংশের সর্বশেষ রাজা কে ?,একাদশ মুহাম্মদ বোয়াবদিল
-item_058,has_context,1,correct,none,pilot_000311,নাঈম হল কার স্মরণে নামকরণ করা হয়েছে?,প্রাক্তন ক্যাডেট ক্যাপ্টেন নাঈম আক্তার (শহীদ)
-item_059,no_context,1,correct,none,pilot_000127,কোনটি নিপাতনে সিদ্ধ স্বরসন্ধির উদাহরণ?,মার্তন্ড/পৌঢ়
-item_060,has_context,1,correct,none,pilot_000051,ফাহিম আহমদ কবে জন্মগ্রহণ করেন?,"ফাহিম আহমদ (জন্ম ১০ আগস্ট, ১৯৮৪) ২০০৬ টরন্টো সন্ত্রাসবাদ মামলায় দোষী সাব্যস্ত ১১ জনের মধ্যে একজন।"
-item_061,no_context,1,correct,none,pilot_000249,"""বিদ্বানকে সকলেই আদর করে।""  বাক্যটি কমর্বাচ্যে কী হবে?",বিদ্বান সকলের দ্বারা আদৃত হন
-item_062,has_context,1,correct,none,pilot_000399,মালয়েশিয়ান রাজনীতিবিদ ও বিরোধীদলীয় নেতা আনোয়ার ইব্রাহীম কত সাল থেকে কত সাল পর্যন্ত মালয়েশিয়ার উপ-প্রধানমন্ত্রী ছিলেন ?,১৯৯৩ থেকে ১৯৯৮ সাল পর্যন্ত।
-item_063,no_context,1,correct,none,pilot_000281,"""ঘরসন্ধানে রাবণ নষ্ট"" এর শাব্দিক অর্থ কী?",ঘর খোঁজার সময় রাবণের ধ্বংস
-item_064,no_context,1,correct,none,pilot_000218,তরুনের কাছে কিছু আঠা আছে। তিস্তা তাকে আরও ২০ টি আঠা দিয়েছিল। এখন তরুনের ৩০ টি আঠা রয়েছে। তরুনকে কত টুকরো দিয়ে শুরু করতে হয়েছিল?,50
-item_065,no_context,0,wrong,fabricated,pilot_000494,তোমার বাবা তোমাকে একটি নোট দিলেন । সেটি ভাঙিয়ে তুমি ৫টি দশ পয়সা ও ২ টি পঁচিশ পয়সা পেলে । নোটটি কত টাকার ছিল ?,83
-item_066,has_context,0,wrong,relational,pilot_000117,সুই সাম্রাজ্যের দ্বিতীয় সম্রাটের নাম কী ?,সুই সাম্রাজ্যের দ্বিতীয় সম্রাট ছিলেন ইয়াং ইউ।
-item_067,has_context,0,wrong,numeric,pilot_000080,কেহকাশান বসু কবে জন্মগ্রহণ করেন?,৫ জুন ২০১৬
-item_068,has_context,0,wrong,relational,pilot_000439,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৫৮ সম্পর্কে কী বলা হয়েছে?",উপজেলা পরিষদের আয় ও ব্যয়ের হিসাব নির্ধারিত পদ্ধতিতে ও ফরমে সংরক্ষণ করিতে হইবে।
-item_069,has_context,1,correct,none,pilot_000496,অ্যালুমিনিয়াম পদার্থটি অ-চৌম্বক পদার্থ?,"হ্যাঁ, অ্যালুমিনিয়াম অ-চৌম্বক পদার্থ।"
-item_070,has_context,0,wrong,numeric,pilot_000335,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ২৯ সম্পর্কে কী বলা হয়েছে?",[(২) নির্বাচন সম্পন্ন হইবার পর অবিলম্বে চেয়ারম্যান ও সদস্যের নাম সরকারি গেজেটে প্রকাশিত হইবে এবং তাঁহাদের শপথ গ্রহণের তারিখ হইতে পরবর্তী ১০ (দশ) কার্যদিবসের মধ্যে উপজেলা পরিষদের প্রথম সভা অনুষ্ঠিত হইবে|]।
-item_071,no_context,0,wrong,fabricated,pilot_000440,একটি কুইজ প্রতিযোগিতায় প্রতিটি ছোট প্রশ্নের জন্য 6 পয়েন্ট এবং প্রতিটি বড় প্রশ্নের জন্য 10 পয়েন্ট থাকে। 2024 পয়েন্ট স্কোর করার জন্য কতগুলো ভিন্ন সংখ্যক প্রশ্নের উত্তর দেওয়া যেতে পারে?,76
-item_072,has_context,0,wrong,relational,pilot_000002,বাংলাদেশ নৌবাহিনীর বর্তমান (২০১৮) নৌসেনা প্রধানের নাম কী ?,অ্যাডমিরাল আহমেদ
-item_073,has_context,1,correct,none,pilot_000001,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৩০ সম্পর্কে কী বলা হয়েছে?","ধারা ৩০ অনুযায়ী, পরিষদ গঠন বা প্রশাসক নিয়োগের পর পূর্ববর্তী দায়িত্বশীল ব্যক্তি পরিষদের নগদ অর্থ, পরিসম্পদ, দলিল, রেজিস্টার ও সিলমোহর নতুন দায়িত্বপ্রাপ্ত ব্যক্তির কাছে হস্তান্তর করবেন।"
-item_074,has_context,1,correct,none,pilot_000171,১ নম্বর সেক্টরের প্রথম কমান্ডার কে ছিলেন?,মেজর জিয়াউর রহমান
-item_075,no_context,0,wrong,fabricated,pilot_000340,'সিক্ত' শব্দের বিপরীতার্থক শব্দ-,নিগ্রহ
-item_076,has_context,1,correct,none,pilot_000228,কামাল খান কবে জন্মগ্রহণ করেন?,কামাল খান (জন্ম: ২৫ এপ্রিল ১৯৮৯) হলেন একজন ভারতীয় সঙ্গীতশিল্পী যিনি সাধারণত বলিউড চলচ্চিত্রে প্লেব্যাক গায়ক হিসেবে কাজের জন্য সুপরিচিত।
-item_077,has_context,0,wrong,numeric,pilot_000022,কুমিল্লা মডার্ণ হাই স্কুলের বর্তমান শিক্ষার্থীর সংখ্যা কত ?,প্রায় ৪০০০ জন।
-item_078,has_context,1,correct,none,pilot_000255,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",এ হামলার পর সেনাবাহিনী ঐ অঞ্চলে প্রতিরক্ষা ব্যবস্থা জোরদার করে এবং পার্বত্য চট্টগ্রামকে ২৪তম ডিভিশনের জিওসির অধীনে আনা হয়।
-item_079,has_context,1,correct,none,pilot_000121,কে ফোর্সের অধিনায়ক কে ছিলেন?,মেজর খালেদ মোশাররফ
-item_080,no_context,1,correct,none,pilot_000371,‘উৎ’ ও ‘যম’ শব্দ দুটির সন্ধিতে কোন শব্দ গঠিত হয়?,উদ্যম
-item_081,has_context,1,correct,none,pilot_000310,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?",বাংলাদেশের সংবিধান প্রণয়নের প্রাক্কালে মানবেন্দ্র নারায়ণ লারমার নেতৃত্বে পাহাড়ি জনগণের একটি প্রতিনিধিদল প্রধানমন্ত্রী বঙ্গবন্ধু শেখ মুজিবুর রহমানের সঙ্গে সাক্ষাৎ করে তাদের পূর্ণ স্বায়ত্তশাসন এবং সাংস্কৃতিক ও ভাষাগত পরিচিতির স্বীকৃতি সম্পর্কিত কতিপয় দাবি পেশ করেন।
-item_082,has_context,0,wrong,numeric,pilot_000491,"প্রদত্ত প্রসঙ্গ অনুযায়ী রাজস্ব বিক্রয় আইন, ১৭৯৩ সম্পর্কে কী তথ্য দেওয়া হয়েছে?","সামাজিক অসন্তোষ ও দ্বন্দ্বসংঘাত, ক্রম অবনতিশীল আইন-শৃঙ্খলা পরিস্থিতি, এবং সর্বোপরি এসব কারণে সরকারি রাজস্ব আদায়ে অনিশ্চয়তা দেখা দিলে ১৮০০ সালে সরকার রাজস্ব বিক্রয় আইন সংশোধন করতে বাধ্য হয়।"
-item_083,has_context,1,correct,none,pilot_000187,বঙ্গভঙ্গ রদের সময় নতুনভাবে অঞ্চল পুনর্বিন্যাস কোন ভিত্তিতে করা হয়?,ভাষাগত ভিত্তিতে
-item_084,no_context,1,correct,none,pilot_000320,বিমলবাবু প্রথমদিন সকালে ৮ কিমি পথ ভ্রমণ করেন এবং দ্বিতীয় দিনে তিনি ৫ কিমি পথ ভ্রমণ করেন । দু - দিনে বিমলবাবু মোট কত কিমি পথ ভ্রমণ করেন ?,13
-item_085,no_context,0,wrong,fabricated,pilot_000212,মনোবিজ্ঞান মূলত কার সাথে সম্পর্কিত হলেও অন্য কাদের ক্ষেত্রেও এটি ব্যবহৃত হয়?,শুধুমাত্র উদ্ভিদের ক্ষেত্রে ব্যবহৃত হয়
-item_086,has_context,0,wrong,numeric,pilot_000195,অনুচ্ছেদের ভিত্তিতে “হিটলার ১৯৩৩ ১৯৪৫ পর্যন্ত জার্মানির” বিষয়ে কোন বক্তব্যটি সঠিক?,হিটলার ১৯৩৪ থেকে ১৯৪৫ সাল পর্যন্ত জার্মানির চ্যান্সেলর এবং ১৯৩৪ থেকে ১৯৪৫ সাল পর্যন্ত সে দেশের ফিউরার ছিলেন।
-item_087,no_context,0,wrong,fabricated,pilot_000402,"""পগারপার হওয়া"" এর ভাবার্থ কী?",প্রিয়জন বা কাঙ্ক্ষিত বস্তু হারানোর ফলে অস্থিরচিত্ত ব্যক্তি
-item_088,has_context,1,correct,none,pilot_000343,মুক্তিযুদ্ধ জাদুঘরের দ্বিতীয় গ্যালারিতে কোন ঘটনা থেকে কোন ঘটনা পর্যন্ত প্রদর্শিত হয়?,৭ মার্চের ভাষণ থেকে ১৭ এপ্রিল প্রবাসী সরকার গঠন পর্যন্ত
-item_089,has_context,0,wrong,relational,pilot_000234,চিন সাম্রাজ্যের প্রতিষ্ঠাতা কে ?,কিন শি করেছিল
-item_090,no_context,0,wrong,fabricated,pilot_000159,আত্মসংবৃতির চিকিৎসাশাস্ত্রীয় প্রথম শ্রেণিবিন্যাস কে করেন?,শান্তিনিকেতনের বিজ্ঞান শিক্ষক জগদানন্দ রায়
-item_091,no_context,0,wrong,fabricated,pilot_000040,১লা মার্চ সূর্য অস্ত যায় সন্ধ্যা ৬টায়। প্রতিদিন সূর্য অস্ত যাওয়ার ১.২ মিনিট পরে। এটি সন্ধ্যা ৬:১০ এ এবং ১লা মার্চের ৪০ দিন পরে৷ সূর্য অস্ত যেতে কত মিনিট?,৩৬
-item_092,has_context,0,wrong,numeric,pilot_000442,প্রদত্ত প্রসঙ্গ অনুযায়ী নীল কমিশন সম্পর্কে কী তথ্য দেওয়া হয়েছে?,এ পরিস্থিতিতে ১৮৫৯ সালে রায়তরা সমগ্র বাংলা জুড়ে জমিদারদের বিরুদ্ধে এক সংগঠিত আন্দোলন শুরু করে।
-item_093,has_context,1,correct,none,pilot_000008,স্বাধীন পাকিস্তানের প্রথম প্রধানমন্ত্রী কে ?,লিয়াকত আলি খান
-item_094,has_context,1,correct,none,pilot_000043,"প্রদত্ত প্রসঙ্গ অনুযায়ী পার্বত্য চট্টগ্রাম শান্তিচুক্তি, ১৯৯৭ সম্পর্কে কী তথ্য দেওয়া হয়েছে?","এতে দাবি করা হয় যে, পার্বত্য এলাকার ১৩টি পৃথক জাতিগোষ্ঠীর সমন্বয়ে জুম্ম জাতি গঠিত।"
-item_095,has_context,0,wrong,relational,pilot_000267,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৫৯ সম্পর্কে কী বলা হয়েছে?","উপজেলা পরিষদের তহবিলের হিসাবসমূহ সরকার যেরূপ বিহিত করিবে, সেইরূপ সময়ে ও স্থানে এবং নির্ধারিত প্রক্রিয়ায় নিযুক্ত কোন নিরীক্ষক কর্তৃক পরীক্ষিত ও নিরীক্ষিত হইবে।"
-item_096,no_context,1,correct,none,pilot_000297,‘মহীন্দ্র’ শব্দের সন্ধি বিচ্ছেদ কী?,মহী + ইন্দ্র
-item_097,no_context,1,correct,none,pilot_000392,জোশের ১৫০ টি পেন্সিল ছিল। তিনি ডোনাকে ৩০ টি পেন্সিল দিয়েছিলেন। জোশের এখন কয়টি পেন্সিল রয়ে গেছে?,120
-item_098,no_context,0,wrong,fabricated,pilot_000412,প্রথম আধুনিক ফ্লাশ টয়লেট কত সালে তৈরি করা হয়?,২৭ নভেম্বর ২০১২
-item_099,has_context,0,wrong,relational,pilot_000398,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৬৬ সম্পর্কে কী বলা হয়েছে?",সরকার উপজেলা পরিষদের জন্য প্রাক প্রকাশনার মাধ্যমে আদর্শ কর তফসিল প্রণয়ন করিতে পারিবে এবং অনুরূপ তফসিল চূড়ান্তভাবে প্রকাশিত হইলে উক্ত আদর্শ কর তফসিলে উল্লিখিত করের পরিমাণ সকল পরিষদের জন্য নমুনা হিসাবে গণ্য হইবে।
-item_100,has_context,0,wrong,numeric,pilot_000012,শচীন তেন্ডুলকার কত সালে পদ্মভূষণ পুরস্কার পান ?,২০০৭ সালে তিনি পদ্মভূষণ লাভ করেন।
+﻿item_id,condition,difficulty,subject,true_label,true_label_word,source_pair_id
+item_001,has_context,easy,law,0,wrong,bnp_002302
+item_002,no_context,easy,literature,1,correct,bnp_002120
+item_003,has_context,easy,others,1,correct,bnp_005556
+item_004,has_context,easy,others,0,wrong,bnp_013198
+item_005,no_context,easy,mathematics,0,wrong,bnp_030693
+item_006,has_context,hard,history,0,wrong,bnp_031567
+item_007,no_context,easy,literature,0,wrong,bnp_004003
+item_008,has_context,hard,history,1,correct,bnp_015365
+item_009,has_context,hard,history,1,correct,bnp_018960
+item_010,has_context,easy,reading_comprehension,0,wrong,bnp_016028
+item_011,no_context,easy,antonym,0,wrong,bnp_022440
+item_012,has_context,easy,history,1,correct,bnp_002223
+item_013,no_context,hard,history,0,wrong,bnp_028229
+item_014,has_context,hard,history,1,correct,bnp_023455
+item_015,no_context,easy,literature,0,wrong,bnp_020881
+item_016,has_context,easy,law,1,correct,bnp_004668
+item_017,no_context,easy,mathematics,0,wrong,bnp_027813
+item_018,no_context,hard,literature,1,correct,bnp_028005
+item_019,no_context,easy,bcs,0,wrong,bnp_004021
+item_020,no_context,easy,bcs,1,correct,bnp_006169
+item_021,has_context,easy,reading_comprehension,1,correct,bnp_019850
+item_022,has_context,easy,history,0,wrong,bnp_021141
+item_023,has_context,easy,reading_comprehension,1,correct,bnp_027848
+item_024,no_context,hard,grammar,0,wrong,bnp_004811
+item_025,no_context,easy,mathematics,1,correct,bnp_002786
+item_026,has_context,hard,history,1,correct,bnp_021983
+item_027,has_context,easy,history,0,wrong,bnp_019872
+item_028,no_context,easy,mathematics,0,wrong,bnp_018397
+item_029,has_context,easy,history,1,correct,bnp_019376
+item_030,has_context,hard,history,1,correct,bnp_025752
+item_031,has_context,easy,others,1,correct,bnp_011331
+item_032,no_context,easy,vocabulary,1,correct,bnp_009236
+item_033,no_context,easy,science,1,correct,bnp_012558
+item_034,has_context,easy,reading_comprehension,1,correct,bnp_011805
+item_035,has_context,easy,others,1,correct,bnp_014346
+item_036,no_context,easy,antonym,0,wrong,bnp_025108
+item_037,has_context,easy,reading_comprehension,0,wrong,bnp_012692
+item_038,has_context,hard,history,0,wrong,bnp_000296
+item_039,no_context,easy,bcs,1,correct,bnp_029564
+item_040,has_context,easy,reading_comprehension,0,wrong,bnp_025846
+item_041,no_context,easy,bcs,1,correct,bnp_009202
+item_042,has_context,easy,history,0,wrong,bnp_005733
+item_043,has_context,easy,history,0,wrong,bnp_002347
+item_044,no_context,hard,grammar,1,correct,bnp_002403
+item_045,no_context,easy,antonym,1,correct,bnp_027585
+item_046,no_context,hard,grammar,1,correct,bnp_001922
+item_047,has_context,easy,reading_comprehension,1,correct,bnp_029592
+item_048,no_context,easy,grammar,0,wrong,bnp_003360
+item_049,no_context,easy,law,0,wrong,bnp_031708
+item_050,no_context,easy,science,0,wrong,bnp_030573
+item_051,has_context,easy,reading_comprehension,1,correct,bnp_010897
+item_052,has_context,easy,history,0,wrong,bnp_003480
+item_053,has_context,easy,reading_comprehension,0,wrong,bnp_024296
+item_054,no_context,easy,synonym,1,correct,bnp_000208
+item_055,no_context,hard,law,0,wrong,bnp_020844
+item_056,no_context,easy,bcs,1,correct,bnp_012952
+item_057,has_context,easy,history,0,wrong,bnp_031093
+item_058,has_context,easy,history,0,wrong,bnp_016181
+item_059,no_context,easy,mathematics,1,correct,bnp_027166
+item_060,has_context,easy,reading_comprehension,1,correct,bnp_021716
+item_061,has_context,hard,reading_comprehension,0,wrong,bnp_031366
+item_062,has_context,easy,reading_comprehension,1,correct,bnp_012630
+item_063,no_context,hard,science,1,correct,bnp_003905
+item_064,has_context,easy,reading_comprehension,0,wrong,bnp_019150
+item_065,has_context,hard,reading_comprehension,0,wrong,bnp_031265
+item_066,no_context,easy,antonym,1,correct,bnp_023226
+item_067,no_context,easy,idiom_meaning,1,correct,bnp_031222
+item_068,has_context,hard,grammar,1,correct,bnp_006664
+item_069,has_context,easy,history,0,wrong,bnp_000912
+item_070,has_context,hard,history,0,wrong,bnp_030207
+item_071,no_context,easy,mathematics,0,wrong,bnp_008593
+item_072,has_context,easy,law,0,wrong,bnp_006861
+item_073,has_context,hard,others,0,wrong,bnp_027521
+item_074,no_context,easy,law,0,wrong,bnp_021982
+item_075,has_context,easy,reading_comprehension,1,correct,bnp_021255
+item_076,has_context,hard,law,1,correct,bnp_024981
+item_077,has_context,hard,history,0,wrong,bnp_020083
+item_078,has_context,easy,reading_comprehension,1,correct,bnp_002313
+item_079,has_context,hard,law,1,correct,bnp_022536
+item_080,has_context,easy,reading_comprehension,0,wrong,bnp_014418
+item_081,has_context,hard,history,0,wrong,bnp_028931
+item_082,has_context,easy,reading_comprehension,1,correct,bnp_001660
+item_083,has_context,easy,others,1,correct,bnp_019027
+item_084,no_context,easy,history,0,wrong,bnp_021571
+item_085,has_context,hard,others,0,wrong,bnp_015023
+item_086,has_context,easy,history,1,correct,bnp_009907
+item_087,has_context,easy,history,0,wrong,bnp_018239
+item_088,no_context,easy,vocabulary,0,wrong,bnp_015505
+item_089,has_context,hard,history,1,correct,bnp_009760
+item_090,has_context,easy,reading_comprehension,1,correct,bnp_030972
+item_091,has_context,hard,reading_comprehension,1,correct,bnp_028124
+item_092,no_context,easy,science,1,correct,bnp_003447
+item_093,no_context,hard,literature,0,wrong,bnp_000275
+item_094,has_context,easy,reading_comprehension,0,wrong,bnp_018265
+item_095,no_context,easy,literature,1,correct,bnp_019312
+item_096,no_context,easy,law,1,correct,bnp_014644
+item_097,no_context,easy,science,0,wrong,bnp_025253
+item_098,has_context,easy,reading_comprehension,1,correct,bnp_023698
+item_099,has_context,hard,law,0,wrong,bnp_009273
+item_100,has_context,easy,history,0,wrong,bnp_014450

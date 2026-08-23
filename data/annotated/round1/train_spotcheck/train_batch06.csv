@@ -1,0 +1,3 @@
+﻿item_id,condition,context,question,answer,your_label,your_type,your_difficulty,your_notes
+train_1251,no_context,,"""হাওয়া খাওয়া"" এর ভাবার্থ কী?",বেড়ানো,correct,none,easy,
+train_1252,has_context,'লাঠালাঠি' শব্দটির ব্যাসবাক্য হলো: লাঠিতে লাঠিতে যে লড়াই।,"ব্যাসবাক্য অনুযায়ী, 'লাঠালাঠি' শব্দটি কোন সমাসের উদাহরণ?",ব্যতিহার বহুব্রীহি,correct,none,hard,

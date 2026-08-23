@@ -1,46 +1,69 @@
-# Product Requirements Document — BanglishHallu Phase 1
+# Product Requirements Document — Phase 1
 
-**Project:** BanglishHallu — Bangla–English Code-Mixed Hallucination Detection
-**Phase:** 1 of 2 — Detector Construction & Score Maximisation
-**Document version:** 1.0
-**Date:** 23 August 2026
-**Status:** Draft for approval
+**Project:** Hallucination detection for Bengali educational question answering
+**Phase 1 scope:** **Bengali only.** Bangla script in, Bangla script out.
+**Phase 2 (later):** Banglish — Bangla written in English letters.
+
+> If this document and any other file disagree, **this document wins**, and the other file
+> should be fixed.
+
+Last updated: 2026-08-23 — the project moved from Banglish-first to Bengali-first. See §14.
 
 ---
 
 ## 1. Executive summary
 
-Phase 1 delivers a **working Bangla–English code-mixed hallucination detector** with a validated, human-annotated corpus and a benchmarked model ladder. The immediate objective is demonstrable detection performance; the strategic objective is to produce a corpus and pipeline that Phase 2 can convert into a publishable research contribution.
+Large language models answer Bengali questions fluently and confidently, and are sometimes
+simply wrong. This project builds a detector that reads a question, an optional passage, and a
+candidate answer, and decides whether the answer is **correct** or **hallucinated**.
 
-Phase 1 is deliberately narrow. It does not attempt the causal analysis of how code-mixing degrades detection — that is Phase 2's contribution and requires this phase's infrastructure to exist first.
+Phase 1 delivers three things:
+
+1. A filtered, human-checked **Bengali** corpus of QA pairs
+2. A benchmarked **model ladder**, from simple word counting up to pretrained transformers
+3. A **reproducible pipeline** and a complete record of every experiment
+
+Banglish is deliberately **not** in Phase 1. It is a harder problem on top of an unsolved one,
+and the earlier attempt to start there failed (§14.1). Bengali first, then Banglish.
 
 ---
 
-## 2. Background and problem statement
+## 2. Background
 
 ### 2.1 The problem
 
-Large language models hallucinate — producing fluent, confident output that contradicts the provided context or fabricates facts. Detection of these hallucinations is an established research area for English and, increasingly, for medium-resource languages.
+Bengali is the sixth most spoken language in the world and remains low-resource for evaluation.
+Students in Bangladesh increasingly use LLMs to study for BCS, SSC, and HSC exams. A confident
+wrong answer in that setting is worse than no answer, because the student cannot tell the
+difference and will memorise it.
 
-Bangla–English code-mixed text ("Banglish") is how a large fraction of Bangladeshi users actually interact with digital systems. It combines two difficulties: Bangla is low-resource, and romanised Bangla has no orthographic standard, so the same word appears with many spellings. Models pretrained on either standard Bangla or English handle it poorly. Prior code-mixed Bangla work found transliteration-induced out-of-vocabulary tokens in roughly 39% of a dataset, which is catastrophic for models never pretrained on such text.
+### 2.2 What already exists
 
-No public, human-annotated, naturalistic Bangla–English code-mixed hallucination **detection** corpus exists.
+**BenHalluEval** (arXiv 2605.31483, 2026) is the first dedicated Bengali hallucination benchmark.
+It covers four tasks — generative QA, code-mixed QA, summarisation, and reasoning — using 12,000
+hallucinated candidates generated with GPT-5.4 across twelve hallucination types, drawn from
+TyDiQA-GoldP, BanglaCHQ-Summ, and SOMADHAN. It evaluates nine LLMs and reports a dual-track
+score. Three of its findings shape this project:
 
-### 2.2 Competitive landscape
+| Their finding | What we do about it |
+|---|---|
+| **Dual-track evaluation is necessary.** Measuring only detection rate hides a model that just says "hallucinated" to everything. | We report per-class metrics separately, always. A single averaged number is not accepted (§5.4). |
+| **Native-speaker validation reached κ = 0.911–0.926.** | Our κ ≥ 0.60 gate is a floor, not a goal. If we land near 0.6 the guidelines need work. |
+| **Code-mixed input behaves differently from native script.** | This is exactly the Phase 2 research question, and the reason Phase 2 is a separate study rather than a variant. |
 
-| Work | What it covers | Gap it leaves |
-|---|---|---|
-| **BenHalluEval** (arXiv 2605.31483) | Bengali hallucination benchmark; 12,000 candidates, 12 types, 4 tasks incl. Bangla–English Code-Mixed QA | Code-mixed track is **synthetically generated** — LLM-converted from 1,000 Bengali GQA seeds. It is an LLM-as-judge *evaluation* framework, not a trainable detection corpus, and does no human annotation of the code-mixed data. |
-| **SHROOM-CAP 2025** | Multilingual scientific hallucination, 9 languages, Bengali as zero-shot | Bengali is zero-shot only; not code-mixed; scientific domain |
-| **BanTH** (arXiv 2410.13281) | 37.3K transliterated Bangla, hate speech | Different task; provides the methodology template |
-| **MixSarc** (arXiv 2602.21608) | Naturalistic Banglish, sarcasm/humour | Different task |
-| **ViHallu** (arXiv 2601.04711) | Vietnamese hallucination, 10K triplets, 111 teams | Different language; provides the target paper structure |
+**Where this project differs.** BenHalluEval evaluates *how well LLMs detect* hallucination by
+prompting them. This project *trains a detector* and benchmarks a full ladder of model families
+on it, across the full subject range of Bengali exam material, with difficulty measured per item
+rather than filtered out (§5.5).
 
-**Positioning:** Phase 1 builds the artifact that occupies the gap — naturalistic (not synthetic) code-mixing, human-annotated, with both grounded and closed-book conditions.
+**The অলীকবচন Kaggle competition** (Bengali LLM Hallucination Detection) is a likely origin of
+part of the source pool. Its licence terms are still unresolved — see Q1.
 
 ### 2.3 Why now
 
-The BenHalluEval group is actively publishing in this exact space (the same authors also produced MixSarc). The window for a naturalistic code-mixed hallucination resource is open but not indefinitely.
+Bengali-capable encoders (BanglaBERT, MuRIL, IndicBERT v2) and Bengali LLMs (TigerLLM, TituLLM,
+BanglaLLaMA) are all now available, and there is still no trained Bengali hallucination detector
+to compare them on.
 
 ---
 
@@ -48,42 +71,49 @@ The BenHalluEval group is actively publishing in this exact space (the same auth
 
 ### 3.1 Goals (Phase 1)
 
-| ID | Goal |
-|---|---|
-| G1 | Construct a human-annotated Bangla–English code-mixed hallucination corpus of ≥ 4,000 QA pairs |
-| G2 | Cover both grounded (has-context) and closed-book (no-context) conditions |
-| G3 | Benchmark a full model ladder from lexical to pretrained-contextual |
-| G4 | Achieve macro-F1 ≥ 0.80 on has-context and ≥ 0.60 on no-context |
-| G5 | Demonstrate corpus validity via a passing shortcut audit |
-| G6 | Produce a reproducible pipeline and complete experiment log |
-
-### 3.2 Non-goals (deferred to Phase 2)
-
-| ID | Deferred item | Rationale |
+| ID | Goal | Status |
 |---|---|---|
-| N1 | Script-controlled CMI degradation study | Requires the parallel four-condition design; Phase 1 records the fields but doesn't run the experiment |
-| N2 | Transliteration normalisation as a *research finding* | Phase 1 uses it as a preprocessing arm only |
-| N3 | Natural vs. synthetic transfer experiment | Needs a synthetic comparison corpus |
-| N4 | Span-level hallucination annotation | Phase 1 captures `error_span` opportunistically but doesn't evaluate on it |
-| N5 | Tokenizer fertility analysis | Phase 2 mechanism analysis |
-| N6 | LLM fine-tuning, RLHF, retrieval augmentation | Out of scope entirely |
-| N7 | Paper writing and venue submission | Phase 2 |
+| G1 | A filtered, human-annotated **Bengali** hallucination corpus, ≥ 4,000 QA pairs | Built (4,480); annotation pending |
+| G2 | Cover both **has-context** (grounded) and **no-context** (closed-book) conditions | Done — 60/40 |
+| G3 | Benchmark a full model ladder: lexical → embedding → recurrent → pretrained | Not started |
+| G4 | **macro-F1 ≥ 0.80 on the has-context hard subset**, **≥ 0.60 on no-context** | Not started |
+| G5 | Pass the **shortcut audit** | Passing (0.534) |
+| G6 | Reproducible pipeline and complete experiment log | In place |
 
-### 3.3 Explicit anti-goals
+**G4 changed, and the change matters.** The original target was 0.80 on all has-context items. A
+plain string matcher already scores **0.812** there, so that target measured nothing. The target
+is now the **hard subset**, where the same string matcher gets 0.456. See §5.5.
 
-- **Do not maximise score at the expense of corpus validity.** A model scoring 0.97 on an artifacted corpus is a failed deliverable.
-- **Do not chase state-of-the-art architectures.** The model ladder is fixed by pedagogical requirement and is scientifically defensible as-is.
+### 3.2 Non-goals — deferred to Phase 2
+
+- Banglish / romanised Bangla in any form
+- Transliteration arms, back-transliteration, code-mixing index (CMI) analysis
+- Span-level (which words are wrong) evaluation
+- Natural-versus-synthetic transfer study
+- Tokenizer fertility analysis
+- Fine-tuning generative LLMs as detectors
+- Writing the paper
+
+### 3.3 Anti-goals — do not do these
+
+- Do **not** raise a score by weakening the corpus. A high score on a broken corpus is a failed
+  deliverable, not a good result.
+- Do **not** report a has-context number without the string-matcher baseline next to it.
+- Do **not** chase state-of-the-art architectures. The ladder is fixed by course requirement.
+- Do **not** use **RAG or any retrieval at inference time** — see §5.3a.
+- Do **not** collect, scrape, or generate more data. The corpus is final (§5.1).
+- Do **not** start Phase 2 work.
 
 ---
 
 ## 4. Stakeholders
 
-| Stakeholder | Interest | Success looks like |
+| Role | Who | Cares about |
 |---|---|---|
-| Course instructor | Demonstrated command of taught methods (N-gram, Skip-gram, RNN, LSTM, BERT) applied to a real problem | Full ladder implemented, results explained, mechanism understood |
-| Student / researcher | Grade; foundation for publication | G1–G6 met; corpus reusable in Phase 2 |
-| Phase 2 (future self) | A clean, extensible corpus and pipeline | Schema includes Phase 2 fields; test set never contaminated |
-| Research community | A usable low-resource resource | Public release with licence, guidelines, IAA |
+| Owner / lead | Tawhidul Hasan | Everything below |
+| Annotators | Owner + 1 native Bangla speaker | §5.1a, the guidelines, the κ gate |
+| Course assessor | Instructor | The full model ladder (M1–M9), reproducibility |
+| Future reader | Phase 2 / paper reviewers | Corpus validity, licence register, honest reporting |
 
 ---
 
@@ -91,98 +121,165 @@ The BenHalluEval group is actively publishing in this exact space (the same auth
 
 ### 5.1 Data requirements
 
-| ID | Requirement | Priority | Acceptance |
+**Every subject is included, and nothing is excluded for being hard.** Law, science, BCS and
+literature are all in the corpus on the same footing as every other subject — 965 pairs, 21.5%
+of the total. Difficulty is measured, never filtered.
+
+**One exception, and it is about task type rather than difficulty: fill-in-the-blank items are
+excluded.** This project is question answering only. A cloze item (শূন্যস্থান পূরণ) trains a
+model to copy the missing span out of the passage instead of judging whether an answer is
+supported, and a plain string matcher scores 0.929 on those items alone. Removing them also
+removes `geography`, which was 100% cloze — a consequence of the task-type rule, not a judgement
+about geography.
+
+An earlier revision filtered the corpus for "answerability" and removed about 4,150 pairs across
+those subjects. **That filter has been removed by decision of the project owner.** What replaced
+it is *measurement* rather than exclusion: the `difficulty` field records which pairs a string
+matcher can already solve, so hard and easy are reported separately instead of one being
+discarded (§5.5).
+
+**The consequence to plan for.** Items in `law`, `science`, `bcs`, and `literature` often ask for
+a date, an article number, or a scientific name. An annotator cannot always verify those from
+memory, so §5.1b defines what they do instead, and results must be broken down by subject
+(§5.4) so any collapse on those subjects is visible rather than averaged away.
+
+**Beyond that, only four things are removed**, none about difficulty: incomplete pairs;
+OCR-damaged text; questions containing a 6+ word run copied verbatim out of their own passage;
+and duplicate question text (which would leak across splits).
+
+### 5.1b Annotator procedure for items needing outside knowledge
+
+| Condition | May the annotator look it up? |
+|---|---|
+| **no-context** | **Yes.** Verify, then label, and note that it was verified. |
+| **has-context** | **No.** Judge only against the passage — an outside source cannot answer "does this passage support this?" and will cause errors. |
+
+If a no-context item cannot be established even after checking, the annotator writes `unsure`
+rather than guessing. `unsure` items are excluded from κ and reported by subject; a high count in
+one subject is a finding about the corpus, not annotator failure.
+
+| ID | Requirement | Priority | Status |
 |---|---|---|---|
-| D1 | ≥ 4,000 annotated QA pairs | **Must** | Count in `data/splits/` |
-| D2 | 60/40 has-context / no-context split | Must | Verified by script |
-| D3 | 50/50 class balance (`0` hallucinated / `1` faithful) | Must | ±5% tolerance |
-| D4 | 500-item test set, 100% human-verified, double-annotated | **Must** | Adjudication log exists |
-| D5 | Cohen's/Fleiss' κ ≥ 0.60 on binary label (§5.1a) | **Must** | Reported in `results/` |
-| D6 | ≥ 500 items with human-written (not generated) Banglish | Should | Provenance field populated |
-| D7 | 100–200 human-written hallucinated answers held out in test | Should | Flagged in test set |
-| D8 | Hallucination type labelled for every hallucinated instance (`label == 0`) | Must | 6-type taxonomy (§5.2) |
-| D9 | Easy/hard difficulty labelled, ~60/40 | Should | Field populated |
-| D10 | Licence recorded for every source | **Must** | `data/SOURCES.md` complete |
-| D11 | `script_condition` and `cmi` fields populated | Should | Phase 2 enabler |
-| D12 | `error_span` captured where available | Could | Phase 2 enabler |
-| D13 | No PII in released data | **Must** | Scrub + manual review |
+| D1 | ≥ 4,000 QA pairs | Must | ✅ 4,480 |
+| D2 | 60/40 has-context / no-context | Must | ✅ 2,688 / 1,792 |
+| D3 | 50/50 class balance (`0` hallucinated / `1` correct) | Must | ✅ exact |
+| D4 | Test split 100% human-verified, double-annotated | Must | ⬜ sheets built, **blind** |
+| D4a | dev/train may be pre-filled and verified; **test may not** — `hallucination_type` is `none` iff the answer is correct, so pre-filling it would reveal the label | Must | ✅ enforced in `build_annotation_sheets.py` |
+| D5 | Cohen's κ ≥ 0.60 on the binary label | Must | ✅ 0.717 |
+| D6 | No subject excluded for difficulty; QA-only (no cloze) | Must | ✅ 13 subjects |
+| D7 | Pairs never split across train/dev/test | Must | ✅ verified |
+| D8 | Hallucination type labelled for every `label == 0` item | Must | ⬜ all `unlabeled` |
+| D9 | Easy/hard difficulty labelled | Must | ✅ by construction (§5.5) |
+| D10 | Licence recorded for every source before ingestion | Must | ⚠ 2 open questions |
+| D11 | `script_condition` and `cmi` populated (Phase 2 payload — never evaluated on) | Should | ✅ |
+| D12 | `error_span` captured where available | Could | ⬜ |
+| D13 | No PII in released data | Must | ⬜ scan pending |
 
-### 5.1a Label convention — PROJECT-WIDE, NON-NEGOTIABLE
+### 5.1a Label convention — project-wide, non-negotiable
 
-```
-label = 1  ->  CORRECT / FAITHFUL     (no hallucination)
-label = 0  ->  INCORRECT / HALLUCINATED
-```
+> **`1` = correct / faithful. `0` = incorrect / hallucinated.**
 
-An **is-it-correct?** flag. `1` = yes, `0` = no. This binding applies to the schema,
-`data/`, every script, every results table, and the implementation guide. It matches
-the ingested source data's native polarity, so no flip is applied anywhere.
+The field answers *"is this answer correct?"*. The **positive class is faithful**, which is the
+reverse of most hallucination papers — there, positive usually means hallucinated.
 
-Note that the **positive class (1) is therefore faithful, not hallucinated** — the
-reverse of much of the literature. Macro-F1 is unaffected (symmetric under a global
-flip); per-class precision/recall must state which class is meant.
+- `probs[:, 1]` is P(correct)
+- The source files already use this convention. **No flip is applied anywhere.**
+- Never flip it in a loader, a metric, or a table. If a per-class number looks swapped, the
+  reading is wrong, not the data.
 
 ### 5.2 Taxonomy requirement
 
-The corpus must use the field's existing intrinsic/extrinsic framing (ViHallu, HalluLens), not a bespoke scheme:
-
-**Intrinsic (has-context):** `entity`, `numeric`, `relational`, `contradiction`
-**Extrinsic (no-context):** `fabricated`, `overclaim`
-**Faithful class (`label == 1`):** `none`
-
-`hallucination_type == "none"` exactly when `label == 1`.
+| Condition | Types |
+|---|---|
+| Intrinsic (has-context) | `entity`, `numeric`, `relational`, `contradiction` |
+| Extrinsic (no-context) | `fabricated`, `overclaim` |
+| Correct answers | `none` |
+| Not yet annotated | `unlabeled` |
 
 ### 5.3 Model requirements
 
-| ID | Requirement | Priority |
-|---|---|---|
-| M1 | N-gram baselines (LogReg + SVM), word and character features | **Must** — pedagogical |
-| M2 | Skip-gram embedding baselines (LogReg + XGBoost) | **Must** — pedagogical |
-| M3 | BiRNN and BiLSTM (+ attention variant) | **Must** — pedagogical |
-| M4 | ≥ 5 pretrained transformer encoders fine-tuned | **Must** |
-| M5 | BanglishBERT and MuRIL specifically included | **Must** — the two models pretrained on transliterated/bilingual data |
-| M6 | Further pretraining on ≥ 1 encoder | Should |
-| M7 | Soft-voting ensemble of top 3 | Should |
-| M8 | Zero-shot LLM reference point (≥ 1 model, ≥ 300 items) | Should |
-| M9 | 3 preprocessing arms × 3 input formats swept on best model | Should |
+Fixed by course requirement. **Adding models is fine; replacing a required one is not.**
+
+| ID | Requirement |
+|---|---|
+| M1 | N-gram baselines (LogReg + SVM), word and character features |
+| M2 | Skip-gram embedding baselines (LogReg + XGBoost) |
+| M3 | BiRNN and BiLSTM (+ attention variant) |
+| M4 | ≥ 5 pretrained transformer encoders fine-tuned |
+| M5 | **BanglaBERT and MuRIL** specifically included |
+| M6 | Further pretraining on ≥ 1 encoder (**mBERT or XLM-R only** — see below) |
+| M7 | Soft-voting ensemble of the top 3 |
+| M8 | Zero-shot LLM reference point (≥ 1 model, ≥ 300 items) |
+| M9 | 3 input formats swept on the best model |
+
+> **BanglaBERT is an ELECTRA discriminator, not a masked LM.** `AutoModelForMaskedLM` will not
+> work on it. Further pretraining targets mBERT and XLM-R. BanglishBERT is optional in Phase 1
+> and becomes central in Phase 2.
+
+### 5.3a Technique constraint — RAG is forbidden
+
+**No retrieval-augmented generation, and no retrieval of any kind at inference time.** That
+rules out vector stores, embedding search over the corpus, nearest-neighbour lookup of similar
+training examples, and fetching any external passage. The model's input is exactly the question,
+the passage already stored in the record (has-context only), and the candidate answer.
+
+Why it matters here: retrieval would let a model answer `law` or `science` items by looking the
+fact up, which measures retrieval quality rather than hallucination detection, and would make
+the no-context condition meaningless.
+
+**Everything else is permitted**, and adding techniques beyond the required ladder is encouraged:
+n-gram models, skip-gram / word2vec, word and text embeddings, RNN, LSTM/BiLSTM with or without
+attention, BERT-family encoders, ensembles, and any other non-retrieval method. The required
+ladder in §5.3 may be *extended* but not *replaced*.
 
 ### 5.4 Evaluation requirements
 
-| ID | Requirement | Priority |
-|---|---|---|
-| E1 | Macro-F1 as primary metric | **Must** |
-| E2 | Results reported separately for has-context / no-context | **Must** |
-| E3 | Results reported by difficulty (easy/hard) | Should |
-| E4 | Results reported per hallucination type | Should |
-| E5 | 5-fold stratified CV on train+dev | **Must** |
-| E6 | 3 random seeds, mean ± std reported | **Must** |
-| E7 | McNemar's test for pairwise model comparison | Should |
-| E8 | Bootstrap 95% CI on headline result | Should |
-| E9 | Test set opened exactly once, at the end | **Must** |
-| E10 | OOV rate and vocabulary coverage logged for classical models | Should |
+- Primary metric: **macro-F1**. Also report accuracy, per-class P/R/F1, and AUC.
+- **Always break results down by:** has-context vs no-context, **easy vs hard**, **by subject**,
+  and (once annotated) hallucination type.
+- Subject breakdown is required because `law`, `science`, `bcs` and `literature` need outside
+  knowledge a closed-book model does not have. A collapse there is a finding, not a defect.
+- Never report a single averaged number on its own. It hides the only differences that matter.
+- Three seeds (42, 1337, 2024), report mean ± std.
+- McNemar's test and bootstrap CI before claiming one model beats another.
 
 ### 5.5 Validity requirements — the gate
 
-| ID | Requirement | Priority | Gate |
-|---|---|---|---|
-| V1 | Metadata-only shortcut probe scores < 0.60 macro-F1 | **Must** | **Blocking** |
-| V2 | Shortcut probe run on the 500-item pilot before full generation | **Must** | **Blocking** |
-| V3 | Answer-only probe substantially below full-input model on has-context | Should | Investigate if violated |
-| V4 | Human-written holdout performance within reasonable range of generated | Should | Report the gap either way |
-| V5 | Any macro-F1 > 0.95 triggers a leakage investigation | **Must** | Documented |
+| ID | Requirement | Status |
+|---|---|---|
+| V1 | Metadata-only shortcut probe scores **< 0.60** macro-F1 | ✅ 0.534 |
+| V2 | Audit rerun after any change to corpus construction | ✅ enforced |
+| V3 | Answer-only probe substantially below the full-input model | ⬜ needs a model |
+| V4 | Every has-context score reported next to the string-matcher baseline | ⬜ enforce at M5 |
+| V5 | Any macro-F1 > 0.95 triggers a leakage investigation | ⬜ |
 
-**V1 and V2 are release gates.** If the pilot fails V1, generation stops, the prompt is fixed, and the pilot is regenerated. No exceptions — this is the single failure mode that would invalidate the entire project.
+**V1 is a blocking release gate.** Weakening the threshold, the feature set, or the split to make
+it pass is the single most damaging thing anyone can do to this project.
+
+**The string-matcher baseline (V4).** The rule *"if the answer text appears in the passage,
+call it correct"* scores:
+
+| Slice | n (records) | String-matcher macro-F1 |
+|---|---:|---:|
+| All has-context | 5,376 | **0.812** |
+| Easy subset | 3,522 | 0.980 |
+| **Hard subset** | 1,600 | **0.456** |
+
+This is a property of the source data: correct answers in extractive QA tend to be verbatim spans
+of the passage, and the generated wrong answers usually are not. `difficulty` encodes it —
+**hard** means the string rule does *not* separate the two answers of that pair, so the model has
+to actually read. A has-context score is meaningless without the hard-subset number beside it.
 
 ### 5.6 Reproducibility requirements
 
-| ID | Requirement | Priority |
+| ID | Requirement | Status |
 |---|---|---|
-| R1 | `results/experiment_log.csv` records every run incl. failures | **Must** |
-| R2 | All seeds fixed and logged | **Must** |
-| R3 | Generation prompts version-controlled | **Must** |
-| R4 | Annotation guidelines document written before annotation begins | **Must** |
-| R5 | Environment pinned (`requirements.txt`) | Should |
-| R6 | Data splits deterministic and script-generated | **Must** |
+| R1 | `results/experiment_log.csv` records every run, including failures | ✅ |
+| R2 | All seeds fixed and logged | ✅ 42, 1337, 2024 |
+| R3 | Any generation prompts version-controlled | ⬜ |
+| R4 | Annotation guidelines written *before* annotation begins | ✅ |
+| R5 | Environment pinned (`requirements.txt`) | ✅ |
+| R6 | Splits deterministic and script-generated | ✅ byte-identical on rerun |
 
 ---
 
@@ -190,35 +287,25 @@ The corpus must use the field's existing intrinsic/extrinsic framing (ViHallu, H
 
 ### 6.1 Primary
 
-| Metric | Floor | Target | Stretch |
-|---|---|---|---|
-| Has-context macro-F1 | 0.75 | **0.85** | 0.90 |
-| No-context macro-F1 | 0.55 | **0.68** | 0.75 |
-| Corpus size | 1,500 | **4,000** | 6,000 |
-| Inter-annotator κ | 0.60 | **0.70** | 0.75 |
-| Shortcut probe | < 0.60 | **< 0.55** | < 0.52 |
+| Metric | Target | Baseline to beat |
+|---|---|---|
+| macro-F1, has-context **hard subset** | **≥ 0.80** | 0.456 (string matcher) |
+| macro-F1, has-context overall | report only | 0.812 (string matcher) |
+| macro-F1, no-context | **≥ 0.60** | 0.333 (majority class) |
+| Metadata shortcut probe | **< 0.60** | — |
+| Cohen's κ | **≥ 0.60** | — |
 
 ### 6.2 Secondary
 
-| Metric | Target |
-|---|---|
-| Hard-subset macro-F1 | ≥ 0.60 |
-| Best-vs-worst encoder spread | Reported with significance test |
-| FPT gain over base | ≥ +1.5 points on at least one model |
-| Ensemble gain over best single | ≥ +1.0 points |
+- Every model family on the ladder benchmarked and logged
+- Clear, honest ordering across the ladder — including reporting ties as ties
+- Per-type breakdown once annotation exists
 
 ### 6.3 External calibration
 
-These are the numbers your results will be compared against:
-
-| Benchmark | Task | Best reported |
-|---|---|---|
-| ViHallu | Vietnamese hallucination, 3-class, w/ context | 84.80 macro-F1 (best of 111 teams); 32.83 encoder baseline |
-| BanTH | Transliterated Bangla, binary | 77.36 macro-F1 (further-pretrained mBERT) |
-| MedHallu | Medical hallucination, hard subset | 0.625 F1 |
-| SHROOM-CAP | Bengali zero-shot factuality | ~0.51 F1 |
-
-A has-context result in the 0.80–0.90 band is competitive and defensible. Results above 0.95 are implausible and must be audited.
+BenHalluEval's BenHalluScore ranges 7.72%–55.42% across models and tasks (lower is better; it is
+a balanced error rate). Our numbers are not directly comparable — different task, different data,
+trained rather than prompted — so do not claim a head-to-head win.
 
 ---
 
@@ -226,162 +313,140 @@ A has-context result in the 0.80–0.90 band is competitive and defensible. Resu
 
 ### 7.1 In scope
 
-- Binary hallucination classification (hallucinated / faithful)
-- Bangla–English code-mixed text, primarily romanised (Banglish)
-- Educational domain: BCS / SSC / HSC level question answering
-- Both grounded and closed-book conditions
-- Classical → pretrained-contextual model ladder
-- Further pretraining, ensembling, threshold tuning
-- Corpus validity auditing
+- Bengali script only, throughout
+- Educational domain (BCS / SSC / HSC style), plus Bangla grammar and vocabulary
+- Binary hallucination detection at the answer level
+- The fixed model ladder (§5.3)
+- Both has-context and no-context conditions
 
 ### 7.2 Out of scope
 
-- Multi-class or multi-label hallucination classification
-- Span-level detection and evaluation
-- Hallucination *mitigation* or correction
-- Retrieval-augmented generation
-- Other language pairs
-- Real-time / production deployment
-- Domains beyond education
-- LLM fine-tuning
+- Anything Banglish or romanised (Phase 2)
+- Span-level detection, CMI analysis, tokenizer fertility (Phase 2)
+- Generation / correction of answers — this project detects, it does not fix
+- Languages other than Bengali
+- Real-time or production serving
 
 ---
 
 ## 8. Milestones
 
-| M# | Week | Milestone | Exit criteria |
+| ID | Milestone | Gate to pass | Status |
 |---|---|---|---|
-| **M0** | 1 | Foundations | Repo, schema, licences audited, seeds fixed, test set designated and locked |
-| **M1** | 1 | **Pilot + validity gate** | 500 items generated; **shortcut probe < 0.60**; prompt finalised |
-| **M2** | 2 | Annotation protocol | Guidelines written; 100-item pilot annotated; κ computed; guidelines revised |
-| **M3** | 3 | Corpus complete | 4,000 items generated + annotated; IAA reported; splits created |
-| **M4** | 4 | Pipeline working | Classical ladder + 1 transformer trained end-to-end; log populated |
-| **M5** | 5 | Full benchmark | All models × 3 arms × 3 formats; 5-fold CV; 3 seeds |
-| **M6** | 6 | **Phase 1 complete** | FPT + ensemble + threshold + LLM reference; all tables; final audit passed |
-
-**M1 is a hard gate.** No progression to M3 without a passing shortcut probe.
+| M0 | Foundations: repo, schema, seeds, source pool ingested and audited | Audit written | ✅ |
+| M1 | Corpus built and filtered for answerability | **V1 metadata probe < 0.60** | ✅ 0.534 |
+| M2 | Annotation protocol proven | **Cohen's κ ≥ 0.60** on 100 blind items | ✅ **0.717** |
+| M3 | Full corpus annotated, splits locked | D4, D8 met | ⬜ **current** |
+| M4 | Model ladder trained (M1–M7) | All families logged | ⬜ |
+| M5 | Sweeps, further pretraining, ensemble | V3, V4 enforced | ⬜ |
+| M6 | Final evaluation on `test.jsonl` — **once** | Targets in §6.1 | ⬜ |
 
 ---
 
 ## 9. Deliverables
 
-| ID | Deliverable | Format |
-|---|---|---|
-| DL1 | Annotated corpus | JSONL, train/dev/test splits |
-| DL2 | Annotation guidelines | Markdown, with worked bilingual examples |
-| DL3 | IAA report | κ per label type, adjudication log |
-| DL4 | Source and licence register | `data/SOURCES.md` |
-| DL5 | Trained model checkpoints | HF format, best model per family |
-| DL6 | Results tables 1–5 | Markdown / CSV |
-| DL7 | Experiment log | `results/experiment_log.csv`, complete |
-| DL8 | Validity audit report | Shortcut probe, answer-only probe, human holdout |
-| DL9 | Reproducible codebase | Git repo, pinned deps, deterministic splits |
-| DL10 | Phase 1 technical report | 6–10 pages, methods + results + limitations |
+| ID | Deliverable |
+|---|---|
+| DL1 | The annotated Bengali corpus |
+| DL2 | Annotation guidelines |
+| DL3 | Inter-annotator agreement report — ✅ `data/annotated/agreement_test_v1/IAA_REPORT.md` |
+| DL4 | Source and licence register |
+| DL5 | Trained model checkpoints |
+| DL6 | Results tables 1–5 |
+| DL7 | Experiment log |
+| DL8 | Validity audit report |
+| DL9 | Reproducible codebase |
+| DL10 | Phase 1 technical report |
 
 ---
 
 ## 10. Risks
 
-| ID | Risk | L | I | Mitigation | Owner |
-|---|---|---|---|---|---|
-| **RK1** | **Generation artifacts inflate scores; corpus invalid** | **H** | **Critical** | Shortcut probe as a blocking gate at M1; length control enforced programmatically; identical prompt template for both classes | Student |
-| RK2 | IAA below 0.60 | M | High | 100-item pilot; explicit edge-case rules; expert adjudication | Student |
-| RK3 | Annotator attrition | M | Med | Recruit 3, require 2 | Student |
-| RK4 | Kaggle data licence prohibits use | M | Low | Treat as external benchmark only; don't build the corpus on it | Student |
-| RK5 | Model spread too tight to distinguish | M | Med | 3 seeds, McNemar, bootstrap CI; report ties honestly | Student |
-| RK6 | No-context split underperforms | H | Low | Expected outcome; report as a finding, not a failure | — |
-| RK7 | Competing group publishes first | M | Med | Phase 1 is a course deliverable; Phase 2 positions against, not ahead of, BenHalluEval | Student |
-| RK8 | GPU quota exhausted | L | Med | Base models only; `max_length=256`; gradient accumulation | Student |
-| RK9 | Scope creep into Phase 2 work | **H** | Med | This PRD's §3.2 is the boundary; defer anything on that list | Student |
-| RK10 | Test set contamination via repeated evaluation | M | High | Test set locked at M0; opened once at M6 | Student |
-
-RK9 deserves emphasis. The Phase 2 experiments are more interesting than the Phase 1 ones, and the temptation to start them early is real. Resist it — Phase 2 depends on a validated corpus, and a half-built corpus with half-built experiments delivers neither.
+| ID | Risk | Mitigation |
+|---|---|---|
+| RK1 | A shortcut inflates scores and the corpus is invalid | V1 gate, run on every rebuild |
+| RK2 | κ below 0.60 | Fix the guidelines, not the annotators; rerun the same 100 items |
+| RK3 | Second annotator drops out | Keep the test set small enough for one person to double-label |
+| RK4 | Kaggle competition licence forbids redistribution | Q1; keep those items separable |
+| RK5 | Model spread too tight to distinguish | 3 seeds + McNemar; report ties honestly |
+| RK6 | No-context underperforms | Expected. It is a harder condition, not a bug |
+| RK8 | GPU quota exhausted | Base-size encoders, `max_length=256`, fp16 |
+| RK9 | Scope creep into Phase 2 | §3.2; flag and stop |
+| RK10 | Test set contaminated by repeated evaluation | Dev for everything; test exactly once at M6 |
+| RK11 | **Lookup-heavy subjects (law/science/bcs) depress annotation quality** | Accepted deliberately — they are in scope. §5.1b lets annotators verify or mark `unsure`; results are broken down by subject so any effect is visible |
 
 ---
 
 ## 11. Dependencies
 
-### 11.1 External
+**External:** Bengali Wikipedia (CC BY-SA 4.0), BCS question banks (licence unresolved),
+`csebuetnlp/banglabert` + `normalizer`, `google/muril-base-cased`, `xlm-roberta-base`,
+`bert-base-multilingual-cased`, Kaggle or Colab GPU.
 
-| Dependency | Type | Risk if unavailable |
-|---|---|---|
-| BEnQA | Base QA source | Low — NCTB-QA, BanglaRQA are substitutes |
-| BanglaTLit-PT (243K texts) | FPT corpus | Low — BanglishRev, MixSarc substitute |
-| `csebuetnlp/banglishbert` + normaliser | Key model | Med — MuRIL substitutes |
-| `google/muril-base-cased` | Key model | Low — Apache 2.0, stable |
-| LLM API (generation + reference) | Generation | Med — open models substitute |
-| Kaggle / Colab GPU | Compute | Low |
-
-### 11.2 Internal
-
-- 2–3 native Bangla annotators with Banglish fluency (M2 onward)
-- 3–5 native writers for human-written Banglish items (M1–M3)
-- Domain expert for adjudication
+**Internal:** the second annotator; the owner's own read-through of the corpus.
 
 ---
 
 ## 12. Open questions
 
-| # | Question | Needed by | Resolution path |
-|---|---|---|---|
-| Q1 | What is the licence on the অলীকবচন Kaggle competition data? | M0 | Log in, read rules tab |
-| Q2 | Does that competition include a code-mixed track, or is it Bengali-only? | M0 | Inspect the dataset |
-| Q3 | What ratio of human-written vs. tool-transliterated Banglish is achievable given annotator availability? | M1 | Recruit first, then set target |
-| Q4 | Does back-transliteration (Arm B) actually help, or does information loss hurt? | M5 | Empirical — that's what the arm sweep is for |
-| Q5 | Should the "not sure" / abstention class be added? | M2 | MedHallu reports up to +38% relative F1 gain from it; test on the pilot |
-| Q6 | Which FPT base model gives the largest gain on *this* task? | M6 | BanTH suggests mBERT and BanglishBERT; verify |
+| ID | Question | Blocks |
+|---|---|---|
+| Q1 | What licence covers the অলীকবচন Kaggle competition data, if the pool draws on it? | DL1 release |
+| Q2 | Did the BCS questions come from an official PSC source or a commercial compilation? | Release of those items |
+| Q3 | What licence does the released corpus carry? (Wikipedia share-alike likely forces CC BY-SA 4.0) | DL1, DL4 |
+| Q4 | Which Claude model and prompts produced the original QA pairs? | R3 |
 
 ---
 
 ## 13. Definition of done
 
-Phase 1 is complete when **all** of the following are true:
+Phase 1 is done when all of the following hold:
 
-- [ ] Corpus of ≥ 4,000 annotated pairs exists with train/dev/test splits
-- [ ] Inter-annotator κ ≥ 0.60 reported
-- [ ] Shortcut probe scores < 0.60 macro-F1 on the final corpus
-- [ ] All Must-priority models (M1–M5) trained and benchmarked
-- [ ] Has-context macro-F1 ≥ 0.80 achieved
-- [ ] No-context macro-F1 ≥ 0.60 achieved
-- [ ] Results tables 1–5 produced
-- [ ] 5-fold CV and 3-seed results reported with variance
-- [ ] Test set was evaluated exactly once
-- [ ] Experiment log complete, including failed runs
-- [ ] Codebase reproducible from a clean environment
-- [ ] Phase 1 technical report written, including a **limitations section**
-- [ ] `data/SOURCES.md` complete with licences
+1. `data/splits/{train,dev,test}.jsonl` are built, locked, and annotated
+2. V1 passes and the audit report is committed
+3. Every model family M1–M9 has been run on 3 seeds and logged
+4. Has-context **hard subset** ≥ 0.80 and no-context ≥ 0.60, or a written explanation of why not
+5. Every has-context number in every table appears next to the string-matcher baseline
+6. `test.jsonl` has been evaluated exactly once
+7. The licence register has no open questions
+8. A fresh clone reproduces the corpus byte-for-byte
 
 ---
 
 ## 14. Transition to Phase 2
 
-Phase 1 hands Phase 2 the following, which is why the schema and locking discipline matter now:
+Phase 2 is the Banglish study: build a code-mixed corpus, run the same pipeline, compare, and
+measure how code-mixing degrades detection.
 
-| Asset | Phase 2 use |
-|---|---|
-| Corpus with `script_condition` + `cmi` fields | Basis for the CMI-controlled degradation curve |
-| Arm A/B/C preprocessing infrastructure | Becomes the normalisation ablation experiment |
-| Full model ladder with per-model results | Becomes the layered mechanism analysis |
-| `error_span` fields | Span-level annotation seed |
-| Human-written holdout | Natural vs. synthetic transfer experiment |
-| Validated pipeline | Lets Phase 2 be about findings, not plumbing |
+### 14.1 What went wrong the first time — read this before starting Phase 2
 
-**Phase 2 headline claim (draft):** *Detection of hallucination in Bangla–English code-mixed text degrades measurably with code-mixing intensity; the degradation is attributable to specific representational levels; and detectors evaluated on synthetically code-mixed data overestimate their performance on naturally occurring Banglish.*
+The project originally began with Banglish. A **rule-based transliteration** (a hand-written
+grapheme map plus a small word dictionary) converted Bengali to romanised Bangla. It produced
+output that a **native Bangla speaker could not read**, and the 500-pair pilot built on it had to
+be discarded.
 
-Phase 1's job is to make that claim checkable.
+**The lesson: do not transliterate with hand-written character rules.** Phase 2 must use a real
+transliteration model or library, and every batch must be read by a native speaker *before* any
+annotation is built on top of it.
+
+### 14.2 What Phase 1 hands over
+
+- A working, audited pipeline that only needs different input data
+- A frozen schema that already carries `script_condition`, `cmi`, and `error_span`
+- Annotation guidelines proven to reach κ ≥ 0.60
+- Bengali baseline numbers to measure code-mixed degradation against
 
 ---
 
-## Appendix — Terminology
+## Appendix — terminology
 
-| Term | Definition |
+| Term | Meaning |
 |---|---|
-| **Banglish** | Romanised Bangla — Bangla written in Latin script, typically with English words interleaved |
-| **Code-mixing** | Use of two or more languages within a single utterance |
-| **CMI** | Code-Mixing Index — quantifies the degree of mixing in an utterance |
-| **Intrinsic hallucination** | Output contradicting the provided context (a faithfulness failure) |
-| **Extrinsic hallucination** | Output contradicting world knowledge with no context provided (a factuality failure) |
-| **FPT** | Further pretraining — continued MLM training of a pretrained encoder on in-domain unlabeled text |
-| **Shortcut / artifact** | A surface feature correlated with the label that lets a model succeed without solving the task |
-| **`label`** | Binary correctness flag. **`1` = correct/faithful, `0` = incorrect/hallucinated** (§5.1a) |
-| **IAA** | Inter-annotator agreement |
+| **has-context** | A passage is given; the answer must be supported by it |
+| **no-context** | No passage; closed-book |
+| **hard** | The string shortcut does not separate this pair's two answers |
+| **pair** | One question with one correct and one hallucinated answer |
+| **intrinsic** | Contradicts the given passage |
+| **extrinsic** | Not checkable against any given passage |
+| **shortcut** | A surface feature that predicts the label without solving the task |
+| **Banglish** | Bangla written in English letters — **Phase 2 only** |

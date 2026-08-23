@@ -44,13 +44,27 @@ Thumbs.db
 # data/raw/bn_qa_pool/*.jsonl
 # data/interim/*.jsonl
 
-# Reviewer working copies of the annotation sheets. The BLANK template and the
-# answer key are tracked; individual annotators' filled-in copies are not, so
-# two people can work in the same clone without colliding.
-data/annotated/agreement_test_v1/items_*.csv
-!data/annotated/agreement_test_v1/items_for_annotation_BLANK.csv
+# Annotation sheets.
+#
+# In-progress copies are ignored so two people can work in the same clone
+# without colliding. FINISHED sheets are tracked on purpose: once a round is
+# scored they are the evidence behind the kappa in the IAA report (DL3), and a
+# result nobody can re-check is not a result.
+data/annotated/**/items_*.csv
+!data/annotated/**/items_for_annotation_BLANK.csv
+!data/annotated/agreement_test_v1/items_for_annotation_tawhid.csv
+!data/annotated/agreement_test_v1/items_for_annotation_shejan.csv
+
+# The M3 round-1 sheets ARE tracked: they are the annotation itself, and losing
+# them loses the labels. The private mapping is tracked too -- it is derived
+# from data already in the repo, so hiding it protects nothing.
+!data/annotated/round1/**
 
 # Scratch
 /tmp/
 scratch/
 *.tmp
+
+# Throwaway sanity splits from build_bn_pool.py. The real splits are
+# data/splits/{train,dev,test}.jsonl, built by src/build_corpus.py.
+data/splits/_pool_sanity/

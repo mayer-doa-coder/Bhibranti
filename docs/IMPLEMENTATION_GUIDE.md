@@ -1,26 +1,34 @@
-# BanglishHallu — Phase 1 Implementation Guide
+# Phase 1 Implementation Guide -- Bengali
 
-**Scope:** Build a working Bangla–English code-mixed hallucination detector and maximise its detection score.
-**Explicitly out of scope for Phase 1:** the script-controlled CMI degradation study, the normalisation ablation as a *research finding*, span-level annotation, and the paper's causal argument. Those are Phase 2.
+**Scope:** build a working **Bengali** hallucination detector and benchmark the full model
+ladder. Bangla script in, Bangla script out.
 
-**Version:** 1.0
+**Out of scope for Phase 1:** anything Banglish or romanised, transliteration arms, the CMI
+degradation study, span-level annotation, and the paper. Those are Phase 2. See
+[PRD.md](PRD.md) section 3.2.
+
+**Version:** 2.0 -- rewritten when the project moved from Banglish-first to Bengali-first.
 **Last verified:** 23 August 2026
 
 ---
 
 ## 0. What "success" means in Phase 1
 
-You are done when all five of these hold:
+You are done when all six hold:
 
 | # | Criterion | Target |
 |---|---|---|
-| C1 | Corpus built, annotated, IAA reported | ≥ 4,000 pairs, Cohen's κ ≥ 0.60 |
-| C2 | Best model on **has-context** split | Macro-F1 ≥ 0.80 |
-| C3 | Best model on **no-context** split | Macro-F1 ≥ 0.60 |
-| C4 | **Shortcut audit passes** | Metadata-only classifier < 0.60 macro-F1 |
-| C5 | Full experiment log exists | Every run recorded with seed + config |
+| C1 | Corpus built and annotated, IAA reported | >= 4,000 pairs, Cohen's kappa >= 0.60 |
+| C2 | Best model on the has-context **hard subset** | macro-F1 >= 0.80 |
+| C3 | Best model on **no-context** | macro-F1 >= 0.60 |
+| C4 | **Shortcut audit passes** | metadata probe < 0.60 macro-F1 |
+| C5 | Every has-context number reported with its string baseline | 0.812 all / 0.456 hard |
+| C6 | Full experiment log exists | every run recorded with seed + config |
+| C7 | **No RAG anywhere** | no retrieval at inference; see section 7.0 |
 
-C4 is not optional. A high score that fails C4 is worthless — it means your model learned generation artifacts, not hallucination. Read Step 9 before you generate a single data point.
+**C4 is not optional.** A high score that fails C4 means the model learned an artifact, not
+hallucination detection. **C5 is the one people forget:** a string matcher scores 0.812 on
+has-context, so a raw 0.83 is not a result. Read section 3.3 before reporting anything.
 
 ---
 
@@ -99,8 +107,8 @@ Fix this before generating anything. Every record:
   "annotator_1": 0,
   "annotator_2": 0,
   "adjudicated": false,
-  "script_condition": "banglish",
-  "cmi": 0.42
+  "script_condition": "bengali",
+  "cmi": 0.0
 }
 ```
 
@@ -143,137 +151,117 @@ def cmi(tokens_lang_counts, n_tokens, n_language_independent):
 
 ---
 
-## 3. Sourcing the base QA pairs
+## 3. The corpus and how it was built
 
-### 3.1 Recommended sources (in priority order)
+**Phase 1 does not generate data.** The corpus already exists and is built deterministically.
+Read the docstring of `src/build_corpus.py` before changing anything about the data.
 
-| Source | What it gives you | Access |
+```
+data/raw/bn_qa_pool/              14 source .jsonl, verbatim, 62,084 records
+  |  src/build_bn_pool.py         clean, dedup, map to the frozen schema
+data/interim/bn_pool.jsonl        56,480 records (the unfiltered pool)
+  |  src/build_corpus.py          answerability filter + pairing + splits
+data/corpus/bn_v1/corpus.jsonl    4,480 pairs / 8,960 records
+data/splits/{train,dev,test}      3,129 / 599 / 678 pairs
+```
+
+Both scripts are deterministic at seed 42 and reproduce byte-identical output.
+
+### 3.1 Scope: every subject is included
+
+**Nothing is excluded for being hard.** Law, science, BCS and literature are all in the corpus —
+965 pairs, 21.5% of the total — on the same footing as everything else.
+
+**This project is QA only, so fill-in-the-blank items are excluded.** That is a task-type rule,
+not a difficulty rule: a cloze item trains span-copying rather than answer checking, and a string
+matcher scores 0.929 on those items alone. It also removes `geography`, which was 100% cloze.
+
+An earlier revision filtered on "answerability" and dropped roughly 4,150 pairs. That filter was
+removed by decision of the project owner. Difficulty is now **measured, not filtered**: the
+`difficulty` field marks which pairs a string matcher can already solve, so hard and easy are
+reported separately (section 3.3).
+
+Two consequences you have to actually handle:
+
+1. **Annotators cannot verify everything from memory.** For no-context items they may look things
+   up, or mark `unsure`; for has-context items they must never look anything up. See PRD 5.1b.
+2. **Report per-subject metrics.** `law`, `science`, `bcs` and `literature` ask for dates,
+   article numbers and scientific names that a closed-book model has no way to know. If the model
+   collapses on those, that is a result to report, not a bug to hide.
+
+### 3.2 The filters, and what each one is for
+
+Only four things are removed, and none of them is about difficulty:
+
+| Filter | Removes | Why |
 |---|---|---|
-| **BEnQA** | ~5K parallel Bengali/English SSC & HSC science exam questions (factual, application, reasoning types) | `github.com/sheikhshafayat/BEnQA` |
-| **NCTB-QA** | 87,805 educational QA pairs over 10,070 contexts, 42.75% unanswerable | arXiv 2603.05462 |
-| **BanglaRQA** | 14,889 QA pairs, 3,000 contexts | Public |
-| **squad_bn** (csebuetnlp) | Bengali SQuAD 2.0 + TyDiQA translations | `csebuetnlp/squad_bn` on HF |
-| Your own BCS/SSC/HSC scrape | Full control, novel | — |
+| Incomplete pairs | groups without both a correct and a wrong answer | cannot form a pair at all |
+| **Fill-in-the-blank** | cloze items (শূন্যস্থান পূরণ, `___`) | **QA only.** Teaches span-copying, not answer checking; 0.929 for a string matcher |
+| Stranded vowel signs | OCR-damaged text ("বিষয়ের ি") | unreadable, therefore unlabelable |
+| Verbatim run >= 6 words | question cut out of its own passage | the question answers itself |
+| Repeated question text | duplicate questions | one copy in train and one in test is leakage |
 
-BEnQA is the strongest starting point: it is already parallel Bengali–English at exactly your target education level, which means generating the Banglish condition is a transliteration step rather than a translation step.
+Plus two composition constraints from the PRD, which shape the sample rather than filter for
+quality: 60/40 has-context to no-context (D2), and a per-subject cap so no subject dominates a
+condition — mathematics alone supplies 76% of the no-context pool and would otherwise swamp it.
 
-**Unanswerable questions matter.** NCTB-QA's 42.75% unanswerable slice is exactly where extrinsic hallucination lives — a model that fabricates an answer to an unanswerable question *is* the phenomenon you're detecting. Include some.
+**There are no fill-in-the-blank items.** `build_corpus.py` asserts this at the end of every
+build, so the corpus cannot silently regain them.
 
-### 3.2 Licence check — do this first
+**One filter that deliberately does NOT exist:** pairs whose *wrong* answer is also a verbatim
+span of the passage are **kept**. An earlier version dropped them, which was backwards --
+removing them leaves only pairs where "appears in the passage" lines up exactly with "is
+correct", and that is what drives the string-matcher baseline up. Those pairs are the
+shortcut-proof ones.
 
-Before ingesting anything:
+### 3.3 The two shortcuts this corpus has to fight
 
-- **csebuetnlp datasets** (`squad_bn`, `xnli_bn`) are **CC BY-NC-SA 4.0 — non-commercial research only**. Fine for your purposes, but you must carry the licence forward and cite.
-- **Kaggle competition data** (অলীকবচন / bengali-hallucination): read the rules tab. Competition-only licences prohibit redistribution. If so, you may use it for internal benchmarking but **cannot ship it in your released dataset**.
-- Scraped exam questions: check the board/publisher terms.
+**1. Metadata shortcut (the blocking gate).** Surface features of the answer alone -- length,
+digit ratio, punctuation -- must not predict the label. Currently **0.534**, gate is < 0.60. PASS
 
-Record the licence of every source in a `data/SOURCES.md` file now. Reviewers and journal editors will ask.
+**2. String-matcher shortcut (report it, do not ignore it).** The rule "if the answer appears in
+the passage, call it correct" scores **0.812** across all has-context items, because correct
+answers in extractive QA are usually verbatim spans and generated wrong answers usually are not.
 
-### 3.3 Producing the Banglish condition
+`difficulty` encodes this per pair. **hard** = the string rule does *not* separate that pair's
+two answers, so the model has to actually read the passage.
 
-Three routes, use all three and mix:
+| Slice | records | String-matcher macro-F1 |
+|---|---:|---:|
+| All has-context | 5,376 | 0.812 |
+| Easy | 3,522 | 0.980 |
+| **Hard** | 1,600 | **0.456** |
 
-1. **Native writers.** Ask 3–5 Bangladeshi students to rewrite items the way they'd actually type them. Highest quality, most naturalistic — this is what distinguishes you from synthetic benchmarks. Aim for at least 500 items via this route.
-2. **Transliteration tooling** applied to the Bengali-script version:
-   - `bnbphoneticparser` / `pyAvroPhonetic` — Avro-style phonetic parsers
-   - `indic_transliteration` (Python)
-   - `bntranslit`
-   - `shadabtanjeed/mbart-banglish-to-bengali-transliteration` (reverse direction, useful for Step 6)
-   - Reference dataset: `SKNahin/bengali-transliteration-data` on HF
-3. **LLM rewriting** with explicit instruction to preserve natural Banglish spelling variance.
+**Never report a has-context score without these numbers next to it.** A model at 0.83 overall
+has beaten a string matcher by one point. The hard subset is where the real result lives.
 
-Then have a native speaker spot-check ~10% of routes 2 and 3. Automated transliteration produces unnaturally consistent spelling; real Banglish is inconsistent, and that inconsistency is the actual difficulty.
+### 3.4 Rebuilding
 
-**Target sizes:**
-
-| Split | Count | Notes |
-|---|---|---|
-| Train | ~3,000 | 60% has-context, 40% no-context |
-| Dev | ~500 | Same stratification |
-| Test | ~500 | **100% human-verified**, stratified |
-| **Total** | **~4,000** | Absolute floor 1,500; ceiling of usefulness ~10,000 |
-
-Class balance: 50/50 hallucinated/faithful. Balanced classes make macro-F1 interpretable and prevent a majority-class classifier from looking good. (BanTH's authors flagged exactly this: their 72.73% non-hate majority meant a dummy classifier beat GPT-3.5.)
+```bash
+python src/build_bn_pool.py     # only if the raw pool changed
+python src/build_corpus.py      # the filter and the splits
+python src/audit.py --data data/splits    # MUST pass before using the result
+```
 
 ---
 
-## 4. Generating hallucinated candidates
+## 4. The corpus is final
 
-### 4.1 The generation protocol
+**Do not collect, scrape, generate, or synthesise more data.** The corpus is closed at 4,480
+pairs by decision of the project owner. This section exists so the decision is not quietly
+reversed later.
 
-**The rule that governs everything: correct and hallucinated answers must be indistinguishable except in factual content.**
+If a future phase ever does need more grounded Bengali QA, the options in order were: regenerate
+the weak wrong answers with an LLM (about 2,400 has-context pairs have a wrong answer not drawn
+from the passage, which is what creates the string shortcut); ingest TyDiQA-GoldP (Bengali),
+BanglaRQA, or BEnQA, recording the licence in `data/SOURCES.md` **before** ingesting (D10); or
+rewrite the excluded fill-in-the-blank items into real questions — they are cloze today, which is
+why they are out, but rewritten they would be valid QA.
 
-```
-Same generator model.
-Same prompt template structure.
-Same temperature.
-Same requested output length.
-Same formatting instructions.
-Only the factual content differs.
-```
-
-Concretely — generate both classes in a single call per item:
-
-```
-System: You are creating evaluation data for a hallucination detection benchmark.
-
-Given the context, question, and reference answer below, produce TWO answers:
-
-  A) A FAITHFUL answer — factually correct and grounded in the context.
-  B) A HALLUCINATED answer — fluent and plausible, but containing exactly one
-     factual error of type: {TYPE}
-
-CONSTRAINTS (apply to BOTH A and B):
-  - Both must be between {L_min} and {L_max} tokens.
-  - Both must use the same register, formatting, and hedging level.
-  - Both must be written in Bangla–English code-mixed style matching the question.
-  - Neither may contain phrases like "I think", "possibly", "it may be" unless
-    both contain them.
-  - Do not signal uncertainty in B. B must sound as confident as A.
-
-Return JSON: {"faithful": "...", "hallucinated": "...", "error_span": "..."}
-```
-
-The `error_span` field is a free win — it costs one extra JSON key now and gives you span-level supervision for Phase 2.
-
-### 4.2 Hallucination taxonomy
-
-Adopt the field's vocabulary rather than inventing one. Map to the intrinsic/extrinsic split used by ViHallu and HalluLens:
-
-**Intrinsic (has-context / faithfulness):**
-| Type | Definition |
-|---|---|
-| `entity` | Wrong named entity substituted (person, place, organisation) |
-| `numeric` | Wrong number, date, quantity, or unit |
-| `relational` | Correct entities, wrong relation between them |
-| `contradiction` | Directly contradicts a statement in the context |
-
-**Extrinsic (no-context / factuality):**
-| Type | Definition |
-|---|---|
-| `fabricated` | Content with no grounding in any source; invented fact |
-| `overclaim` | Answers a genuinely unanswerable question with false confidence |
-
-### 4.3 Easy vs. hard difficulty
-
-Generate both. MedHallu found the best model reached only 0.625 F1 on their "hard" category, and that harder-to-detect hallucinations are semantically closer to ground truth. A difficulty breakdown makes your results table far more informative than a single number.
-
-- **Easy:** wrong entity from a different domain (Newton → Shakespeare)
-- **Hard:** plausible near-miss (9.8 m/s² → 9.6 m/s²; 1971 → 1972; a sibling concept)
-
-Target ~60% easy / 40% hard.
-
-### 4.4 Length control — enforce it programmatically
-
-Do not trust the prompt. Verify:
-
-```python
-def length_ok(faithful, hallucinated, tol=0.15):
-    lf, lh = len(faithful.split()), len(hallucinated.split())
-    return abs(lf - lh) / max(lf, lh, 1) <= tol
-```
-
-Regenerate any pair that fails. Log the rejection rate — if it's above ~20%, your prompt needs tightening.
+**What not to do:** generate distractors with hand-written span-swapping rules. It was tried. It
+produced truncated words, sentence fragments, and type mismatches — a *place* offered as the
+answer to "what was his father's name?". The existing LLM-written wrong answers are markedly
+better.
 
 ---
 
@@ -281,7 +269,7 @@ Regenerate any pair that fails. Log the rejection rate — if it's above ~20%, y
 
 ### 5.1 Protocol
 
-- **2 annotators minimum**, both native Bangla speakers comfortable with Banglish. 3 is better.
+- **2 annotators minimum**, both native Bangla speakers. 3 is better.
 - Write an explicit guidelines document *before* annotation begins. BanTH's Appendix B is an excellent template to imitate — it gives per-category definitions with worked bilingual examples.
 - Run a **pilot on 100 items**, compute agreement, resolve disagreements, revise guidelines, *then* annotate the rest.
 - A domain expert (you, or your supervisor) adjudicates disagreements.
@@ -312,42 +300,67 @@ If the 20% sample shows > 5% label noise, verify more.
 
 ---
 
-## 6. Preprocessing and the three input arms
+## 6. Preprocessing and input formats
 
-Build **three parallel preprocessing arms** and run every model through all three. This is cheap and one of them will win.
+Phase 1 is Bengali script throughout, so there are **no transliteration arms**. The old
+raw / back-transliterated / dual three-arm design belongs to Phase 2, where the input is Banglish
+and converting it to Bengali script is a genuine modelling choice. Here it would be a no-op.
 
-### Arm A — Raw
-Text as-is. Minimal cleaning: strip URLs, collapse whitespace, remove PII.
+What Phase 1 does have is normalisation and input format -- and format usually matters more than
+architecture.
 
-### Arm B — Normalised (Bengali script)
-Back-transliterate Banglish → Bengali script, then apply the csebuetnlp normaliser.
+### Normalisation -- required for BanglaBERT
+
+BanglaBERT was pretrained on text passed through csebuetnlp's normaliser. Skipping it costs
+accuracy for no reason.
 
 ```python
 from normalizer import normalize
-text_bn = back_transliterate(text_banglish)   # Avro / mBART / indic_transliteration
-text_bn = normalize(text_bn)
+text = normalize(text)        # Bengali script -- correct usage in Phase 1
 ```
 
-**Important caveat:** the csebuetnlp `normalize()` pipeline is designed for Bengali script. Applying it to Latin-script Banglish is not what it was built for. Use it *after* back-transliteration, and for BanglaBERT/BanglishBERT specifically — those models were pretrained with it, so skipping it degrades results.
+Use the same normalisation at training and at inference, and log which you used. For mBERT,
+XLM-R, and MuRIL it is optional -- run it as an ablation rather than assuming.
 
-### Arm C — Dual
-Concatenate raw Banglish and its back-transliteration: `banglish [SEP] bengali_script`. Lets the model use both views.
+### Input formats -- sweep all three (M9)
 
-### Input format variants
+| Format | Template | Notes |
+|---|---|---|
+| F1 (plain) | `question + " " + answer` | The only option for no-context items |
+| F2 (with context) | `context + " " + question + " " + answer` | |
+| F3 (NLI-style) | `[CLS] context [SEP] question + answer [SEP]` | Usually best for has-context |
 
-Test all three per arm. Format often matters more than architecture:
+F3 frames the task as textual entailment -- "does this passage entail this answer?" -- which is
+close to what pretrained NLI models already do. Starting from an XLM-R checkpoint already
+fine-tuned on XNLI is worth trying.
 
-| Format | Template |
-|---|---|
-| F1 (plain) | `question + " " + answer` |
-| F2 (with context) | `context + " " + question + " " + answer` |
-| F3 (NLI-style) | `[CLS] context [SEP] question + answer [SEP]` |
-
-For the has-context split, **F3 usually wins** — framing hallucination as textual entailment lets the model exploit pretrained NLI-like structure. Consider initialising from an XLM-R checkpoint already fine-tuned on XNLI.
+**Truncation matters more than usual here.** Passages have a median length of 295 characters but
+run up to 3,132. At `max_length=256` a long passage gets cut, and if the supporting sentence is
+what got cut, the label is no longer derivable from the input -- you are training on noise.
+Truncate the **context**, never the question or the answer.
 
 ---
 
 ## 7. Model ladder
+
+### 7.0 Technique constraint — RAG is forbidden
+
+**No retrieval-augmented generation and no retrieval of any kind at inference time.** No vector
+store, no embedding search over the corpus, no nearest-neighbour lookup of similar training
+examples, no fetching external passages. Model input = question + the passage already in the
+record (has-context only) + candidate answer.
+
+Retrieval would let a model answer `law` or `science` items by looking the fact up. That measures
+retrieval, not hallucination detection, and it destroys the no-context condition entirely.
+
+Using embeddings as **features** is fine and expected — word2vec, skip-gram, and encoder
+representations are all just feature extractors here. The prohibition is on *retrieving other
+documents or examples at inference*, not on embeddings as such.
+
+Everything non-retrieval is allowed and extensions are welcome: n-gram, skip-gram/word2vec, word
+and text embeddings, RNN, LSTM/BiLSTM (+attention), BERT-family encoders, ensembles. The required
+ladder below may be extended but not replaced.
+
 
 ### 7.1 Classical baselines (your syllabus models — the lower bound)
 
@@ -363,7 +376,7 @@ Run these first. They are fast, they give you a working pipeline in an afternoon
 | BiLSTM | 2 layers, hidden 256, dropout 0.3, Skip-gram init | — |
 | BiLSTM + Attention | + additive attention over hidden states | — |
 
-Char n-grams matter a lot here — Banglish spelling variance means word-level features fragment badly, and character features partially recover it.
+Char n-grams matter a lot here — Bangla is heavily inflected and compounds freely, so word-level features fragment across surface forms of the same root. Character features partially recover that. They also catch the near-miss wrong answers (পুনর্মিলন vs পুনঃমিলন), which differ by a character or two.
 
 Expect 0.50–0.65 macro-F1 at 4K training examples. That is the correct result, not a failure. These models have no pretraining to fall back on.
 
@@ -373,19 +386,21 @@ Expect 0.50–0.65 macro-F1 at 4K training examples. That is the correct result,
 
 | Model | HF ID | Architecture note |
 |---|---|---|
-| BanglishBERT | `csebuetnlp/banglishbert` | **ELECTRA discriminator**, pretrained on Bengali + English. Requires csebuetnlp normaliser. |
-| BanglaBERT | `csebuetnlp/banglabert` | ELECTRA discriminator, Bengali only. Expect it to lose on Banglish — that's a finding. |
+| **BanglaBERT** | `csebuetnlp/banglabert` | **ELECTRA discriminator**, Bengali only. Your primary Phase 1 model. Requires the csebuetnlp normaliser. |
+| BanglishBERT | `csebuetnlp/banglishbert` | ELECTRA discriminator, Bengali + English. Optional here; central in Phase 2. |
 | BanglaBERT large | `csebuetnlp/banglabert_large` | If VRAM allows |
 | MuRIL | `google/muril-base-cased` | BERT, 17 Indian languages **+ their transliterated counterparts** (Wikipedia via IndicTrans + Dakshina). Apache 2.0. |
 | MuRIL large | `google/muril-large-cased` | — |
 | XLM-R | `xlm-roberta-base` / `-large` | Strong general multilingual baseline |
 | mBERT | `bert-base-multilingual-cased` | — |
 | IndicBERT v2 | `ai4bharat/IndicBERTv2-MLM-only` | — |
-| Mixed-Distil-BERT | See arXiv 2309.10272 | Pretrained on BN-EN-HI code-mixed data |
+| Mixed-Distil-BERT | See arXiv 2309.10272 | BN-EN-HI code-mixed. Phase 2 candidate, not Phase 1. |
 
-**Why BanglishBERT and MuRIL are your top candidates:** both saw transliterated/cross-script data during pretraining. MuRIL's model card is explicit that it was trained on transliterated data because that phenomenon is common in the Indian context. Everything else is guessing at romanised Bangla.
+**Why BanglaBERT and MuRIL are your top Phase 1 candidates:** BanglaBERT is pretrained on Bengali specifically and should lead on native script. MuRIL covers 17 Indian languages and is required by M5. XLM-R is the strong general baseline that often wins anyway — see the spread below.
 
-**Reality check from a comparable task.** On BanTH (transliterated Bangla, binary hate speech, 37.3K samples), fine-tuned baselines landed:
+> MuRIL's transliteration coverage and BanglishBERT's cross-script pretraining are advantages for **Phase 2**, not for Phase 1. Do not pick a Phase 1 model on that basis.
+
+**Reality check from a comparable task.** BanTH is *transliterated* Bangla (so a Phase 2 analogue, not a Phase 1 one), binary hate speech, 37.3K samples. Take the *spread*, not the ordering, as the lesson:
 
 | Model | Macro-F1 |
 |---|---|
@@ -397,7 +412,7 @@ Expect 0.50–0.65 macro-F1 at 4K training examples. That is the correct result,
 | mBERT | 74.97 |
 | IndicBERT | 74.51 |
 
-Note how tight that spread is — 2.8 points across seven very different models. **Do not expect architecture choice alone to transform your score.** Preprocessing, input format, and further pretraining will move the needle more.
+Note how tight that spread is — 2.8 points across seven very different models. **Do not expect architecture choice alone to transform your score.** Input format and further pretraining will move the needle more. Report ties as ties (McNemar), and expect BanglaBERT to rank higher on Bengali script than it did on that transliterated task.
 
 ### 7.3 Fine-tuning hyperparameters
 
@@ -422,7 +437,7 @@ from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
 from sklearn.metrics import f1_score, accuracy_score
 import numpy as np
 
-MODEL = "csebuetnlp/banglishbert"
+MODEL = "csebuetnlp/banglabert"
 tok = AutoTokenizer.from_pretrained(MODEL)
 model = AutoModelForSequenceClassification.from_pretrained(MODEL, num_labels=2)
 
@@ -468,7 +483,7 @@ Masking rate:   15%
 Learning rate:  1e-5
 Batch size:     32
 Epochs:         5
-Corpus:         unlabeled transliterated Bangla
+Corpus:         unlabeled Bengali text (Phase 1) / transliterated Bangla (Phase 2)
 ```
 
 ### 8.2 Corpus
@@ -492,7 +507,7 @@ From BanTH's binary classification results, comparing base → further-pretraine
 | BanglaBERT | 76.50 | 77.12 | +0.62 |
 | XLM-R | 77.35 | 77.04 | **−0.31** |
 
-Two lessons here. First, FPT gains are real but modest — 2 points, not 20. Second, **it does not always help**: XLM-R got slightly worse. The models that gain most are those with the weakest transliterated-text coverage to begin with. So run FPT on mBERT and BanglishBERT first, and treat XLM-R FPT as optional.
+Two lessons here. First, FPT gains are real but modest — 2 points, not 20. Second, **it does not always help**: XLM-R got slightly worse. The models that gain most are those with the weakest transliterated-text coverage to begin with. In Phase 1 the FPT targets are **mBERT and XLM-R** — they are the standard MLM models in the ladder. BanglaBERT and BanglishBERT are ELECTRA discriminators and cannot be further pretrained with `AutoModelForMaskedLM`; see the note below.
 
 ### 8.4 Implementation sketch
 
@@ -573,7 +588,7 @@ If it fails, inspect `clf.coef_` to find the leaking feature, fix the generation
 Work down this list. Stop when you hit your target.
 
 ### 10.1 Input format sweep — highest ROI
-Run F1/F2/F3 × Arm A/B/C = 9 configs on your best single model. Often worth 3–6 points. Half a day.
+Run F1/F2/F3 on your best single model (Phase 1 has no transliteration arms — see section 6). Also sweep normalised vs raw. Often worth 3–6 points. Half a day.
 
 ### 10.2 Further pretraining
 Section 8. Worth ~2 points on the right base model. One day.
@@ -585,7 +600,7 @@ If your model is at 0.90 on easy and 0.55 on hard, adding hard examples to train
 Average the predicted probabilities of your top 3 encoders. Reliably worth 1–3 points and it's what the top BLP shared-task teams do.
 
 ```python
-probs = (p_banglishbert + p_muril + p_xlmr) / 3
+probs = (p_banglabert + p_muril + p_xlmr) / 3
 # column 1 is P(correct) under this project's convention (1 = correct)
 preds = (probs[:, 1] > threshold).astype(int)
 ```
@@ -690,10 +705,10 @@ The no-context number will be much lower than has-context. **That is correct, no
 | XLM-R | | | | |
 | MuRIL | | | | |
 | BanglaBERT | | | | |
-| BanglishBERT | | | | |
+| IndicBERT v2 | | | | |
 | *Further pretrained* | | | | |
-| TB-mBERT (ours) | | | | |
-| TB-BanglishBERT (ours) | | | | |
+| FPT-mBERT (ours) | | | | |
+| FPT-XLM-R (ours) | | | | |
 | *Ensemble* | | | | |
 | Soft-vote top-3 | | | | |
 | *LLM reference* | | | | |
@@ -701,7 +716,7 @@ The no-context number will be much lower than has-context. **That is correct, no
 
 **Table 2 — Difficulty breakdown** (easy/hard × model)
 **Table 3 — Per-hallucination-type F1**
-**Table 4 — Preprocessing arm × input format ablation**
+**Table 4 — Normalisation × input format ablation**
 **Table 5 — Shortcut audit results**
 
 ---
@@ -741,7 +756,8 @@ Six weeks part-time. Weeks 1–3 are the ones people underestimate — data work
 **Read first:**
 - **BanTH** — arXiv 2410.13281. Transliterated Bangla, FPT recipe, full baseline table, annotation guidelines in Appendix B. Your closest methodological template.
 - **DSC2025 ViHallu** — arXiv 2601.04711. Vietnamese hallucination shared task; the paper structure you'll eventually write.
-- **BenHalluEval** — arXiv 2605.31483. Bengali hallucination benchmark incl. a Bangla–English code-mixed track. Know it in detail.
+- **BenHalluEval** — arXiv 2605.31483. The Bengali hallucination benchmark. Four tasks (generative QA, code-mixed QA, summarisation, reasoning), 12,000 hallucinated candidates generated with GPT-5.4 across twelve hallucination types, sourced from TyDiQA-GoldP, BanglaCHQ-Summ and SOMADHAN. Nine LLMs evaluated under a dual-track protocol; BenHalluScore is a balanced error rate spanning 7.72–55.42%. Native-speaker validation reached κ = 0.911–0.926. **Read it before writing anything up** — it is the work your results will be compared against.
+- **অলীকবচন / Bengali LLM Hallucination Detection** — `kaggle.com/competitions/bengali-hallucination`. Possible origin of part of the source pool; licence unresolved (PRD Q1). Read the rules tab.
 
 **Models & resources:**
 - BanglaBERT / BanglishBERT — arXiv 2101.00204, `github.com/csebuetnlp/banglabert`

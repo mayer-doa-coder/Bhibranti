@@ -1,27 +1,47 @@
 # Dataset audit — `bn_qa_pool` (the supplied "small dataset" files)
 
 **Audited:** 23 August 2026 · **Records examined:** 62,084 across 14 files
-**Reproduce:** `python src/build_bn_pool.py && python src/audit.py --data data/splits/bn_dev_benchmark`
+**Reproduce:** `python src/build_bn_pool.py && python src/build_corpus.py && python src/audit.py --data data/splits`
+
+> **Read this first.** This audit was written while the project was Banglish-first. The
+> project is now **Bengali-first** (PRD §14.1), which *inverts* its central finding: what
+> Finding 2 called a blocking gap — that the pool is Bengali script — is now exactly what the
+> project wants. Findings 1, 3, 4 and 5 (duplicates, label convention, the substring
+> shortcut, subject imbalance) are unchanged and still matter. The verdict and the
+> requirement table below have been updated; the rest is kept as the original audit record.
 
 ---
 
 ## Verdict
 
-> **Not sufficient as the Phase 1 corpus. Genuinely valuable as the base QA layer it is
-> built from.**
+> **Suitable as the Phase 1 source pool, after filtering. Not usable as-is.**
 
-The blocker is not size or quality — it is **language variety**. This pool is monolingual
-**Bengali script**; 0.96% of its alphabetic characters are Latin. BanglishHallu is about
-**romanised Bangla–English code-mixed text**. There is essentially no Banglish in here.
+The pool is monolingual **Bengali script** (0.96% Latin characters), which is exactly right for
+Phase 1. After cleaning it yields **19,420 complete correct/hallucinated pairs**.
 
-That is a recoverable position, not a dead end. The implementation guide (§3.3) recommends
-BEnQA precisely *because* it is Bengali-script, so that producing the Banglish condition is a
-**transliteration** step rather than a translation step. This pool fits the same slot, and it is
-substantially larger than BEnQA (~5K): after cleaning it yields **19,420 complete
-faithful/hallucinated pairs** — nearly 5× the PRD's 4,000-record target.
+It needs processing, not exclusion. `src/build_corpus.py` pairs it, removes only invalid
+records, and applies the PRD's composition constraints.
 
-So: this is `data/raw/`, not `data/splits/`. It removes the *sourcing* problem (M0) entirely.
-It does not remove the *Banglish generation* problem (M1) or the *annotation* problem (M2–M3).
+**No subject is excluded for being hard.** The lookup-heavy ones — law, science, BCS,
+literature — are all kept (965 pairs, 21.5% of the corpus). An interim revision filtered them
+out; that filter was removed by decision of the project owner, and difficulty is now measured
+per item rather than excluded.
+
+**One task-type rule does remove items: this project is QA only, so fill-in-the-blank (cloze)
+items are excluded.** A cloze item trains span-copying rather than answer checking, and a string
+matcher scores 0.929 on those alone. This removes `geography` entirely, since every geography
+item in the pool was fill-in-the-blank. 13 subjects remain.
+
+The one real hazard is **Finding 4, the string-matching shortcut**: correct answers are usually
+verbatim spans of the passage and wrong answers usually are not, so a string matcher scores
+**0.812** on has-context without learning anything. It is handled by the `difficulty` field
+rather than by deletion — on the *hard* subset the same rule scores only **0.456**.
+
+Result: **4,480 pairs / 8,960 records** in `data/corpus/bn_v1/corpus.jsonl`, of which 927
+has-context pairs are *hard*.
+
+So: this is `data/raw/`. It removes the *sourcing* problem (M0) and, after filtering, the
+*corpus* problem (M1). It does not remove the *annotation* problem (M2–M3).
 
 ---
 
@@ -83,7 +103,12 @@ hallucinated one — consistent with the project convention throughout.
 
 ---
 
-## Finding 2 — This is Bengali script, not Banglish (blocking, unresolved)
+## Finding 2 — This is Bengali script (was blocking; now RESOLVED as correct)
+
+> **Superseded.** When this was written, Phase 1 was Banglish and the absence of romanised
+> text was the project's central blocker. Phase 1 is now Bengali, so this finding simply
+> confirms the pool is the right script. It is kept because the measurements below are still
+> the reference numbers, and because Phase 2 will need them.
 
 | Measure | Value |
 |---|---|
@@ -96,11 +121,15 @@ The Latin that exists is mostly parenthetical glosses (`দ্য রিপা�
 code-mixing. The `vocabulary` file is the only one above 3% Latin (14.3%), because it glosses
 English meanings.
 
-**Consequence:** the project's central claim — that hallucination detection degrades on
-Bangla–English code-mixed text — cannot be evaluated on this data at all. BanglishBERT and
-MuRIL are in the model ladder specifically because they saw *transliterated* text during
-pretraining; on pure Bengali script that advantage disappears and BanglaBERT would likely win,
-which measures something else entirely.
+**Consequence, as of the Bengali-first pivot:** none for Phase 1 — this is the intended
+script. Two things follow instead:
+
+- **BanglaBERT becomes the primary encoder**, not BanglishBERT. On native script BanglaBERT
+  should lead, and that is now the expected result rather than a confound.
+- **The cross-script advantage of MuRIL and BanglishBERT is Phase 2 payload.** Do not select a
+  Phase 1 model on it.
+
+For Phase 2, these numbers are the baseline the code-mixed corpus will be measured against.
 
 **What closes the gap** (guide §3.3, all three routes):
 1. Native writers rewrite items as they would actually type them — target ≥ 500 items (PRD D6).
@@ -142,7 +171,9 @@ A probe the PRD does not specify, added in `src/audit.py`:
 
 ```
 TRIVIAL RULE: "candidate answer is a substring of the context" -> faithful
-  macro-F1 on has-context items = 0.832
+  macro-F1 on has-context items = 0.832   (source pool, before pairing)
+  macro-F1 on the built corpus    = 0.812   (all has-context)
+  macro-F1 on the HARD subset     = 0.456   <- the shortcut is useless here
 ```
 
 **No learning at all — pure string matching — beats the project's has-context target of 0.80.**
@@ -220,30 +251,29 @@ Phase 2's headline claim about synthetic-vs-natural transfer depends entirely on
 
 | Req | Requirement | Status |
 |---|---|---|
-| D1 | ≥ 4,000 pairs | ✅ 19,420 complete pairs available |
-| D2 | 60/40 has/no-context | ⚠️ pool is 20/80; enough has-context exists to subsample to 60/40 |
+| D1 | ≥ 4,000 pairs | ✅ 19,420 in pool → **4,480 after pairing + composition constraints** |
+| D2 | 60/40 has/no-context | ✅ corpus is exactly 60/40 (2,688 / 1,792) |
 | D3 | 50/50 class balance | ✅ 49.7/50.3 |
 | D4 | 500-item test set, human-verified, double-annotated | ❌ no annotation |
 | D5 | κ ≥ 0.60 | ❌ not computable |
-| D6 | ≥ 500 human-written Banglish items | ❌ zero Banglish |
+| D6 | No subject excluded for difficulty; QA-only (no cloze) | ✅ 13 subjects present |
 | D8 | Hallucination type on all positives | ❌ absent |
-| D9 | Easy/hard difficulty | ❌ absent |
+| D9 | Easy/hard difficulty | ✅ assigned by `build_corpus.py` — hard = shortcut-proof |
 | D10 | Licence recorded for every source | ⚠️ sources known (Wikipedia CC BY-SA 4.0 + BCS banks); BCS terms and release licence still open |
-| D11 | `script_condition` + `cmi` populated | ⚠️ populated, but values reflect Bengali script |
+| D11 | `script_condition` + `cmi` populated | ✅ `bengali`, cmi ≈ 0 — correct for Phase 1 |
 | D13 | No PII | ⚠️ not yet scanned |
 | V1 | Metadata probe < 0.60 | ✅ **0.453 – 0.506, passes** |
 | V3 | Answer-only well below full input | ✅ 0.581 |
-| — | Code-mixed Banglish (PRD §7.1 scope) | ❌ **0.96% Latin — the blocking gap** |
+| — | Bengali script (PRD §7.1 scope) | ✅ **0.96% Latin — correct for Phase 1** |
 
-**7 of 14 unmet, 1 blocking for the project's premise (Banglish).** D10 moved from unknown to
-partly resolved.
+**Remaining unmet: D4, D5, D8, D13 — all annotation or PII work, none blocking corpus
+construction.** The former blocking gap (script) is resolved by the Bengali-first pivot.
 
 ---
 
 ## What this data unblocks right now
 
-Do not wait on the Banglish work to start building. With `data/splits/bn_dev_benchmark/` you
-can, today:
+The filtered corpus and splits already exist, so you can, today:
 
 - Build and debug the entire model ladder end-to-end — **milestone M4**, on real data
 - Validate `train_classical.py`, `train_transformer.py`, `evaluate.py`, the 5-fold CV harness,
@@ -252,22 +282,23 @@ can, today:
   *the same detector, same questions, Bengali script vs Banglish* is close to Phase 2's headline
   claim and costs nothing extra to have
 
-When reporting any number from this benchmark, state that it is Bengali-script and that the
-0.832 substring shortcut is present. It is a pipeline test, not a result.
+When reporting any has-context number, quote the string-matcher baseline next to it — **0.812
+across all has-context items, 0.456 on the hard subset**. Without those, the number cannot be
+interpreted.
+
+Also break results down **by subject**. `law`, `science`, `bcs` and `literature` ask for facts a
+closed-book model cannot know; a collapse there is a finding to report, not a defect to hide.
 
 ---
 
 ## Recommended next actions
 
-1. **Close the two remaining licence questions** (`data/SOURCES.md`): whether the BCS questions
+1. **Run the annotation agreement test (M2)** — two people label
+   `data/annotated/agreement_test_v1/`, then `python src/score_agreement.py`. Needs κ ≥ 0.60.
+   This is the longest lead-time item and the current gate.
+2. **Close the two remaining licence questions** (`data/SOURCES.md`): whether the BCS questions
    came from an official PSC source or a commercial compilation, and what licence the released
    corpus carries. Wikipedia's CC BY-SA 4.0 share-alike almost certainly propagates to it.
-2. **Run the Banglish generation step** (guide §3.3) over the cleaned pool — this is the actual
-   critical path.
-3. **Fix the copy-from-context shortcut in the generation prompt** before generating at scale,
-   or the real corpus inherits Finding 4.
-4. **Write `docs/ANNOTATION_GUIDELINES.md`** and recruit annotators (M2). This is the longest
-   lead-time item and is currently at zero.
-5. **PII scan** the pool (D13) before anything is published.
-6. Keep `data/splits/train|dev|test.jsonl` — the real, locked Phase 1 splits — **empty until
-   M3**. The benchmark under `bn_dev_benchmark/` must never be promoted into them.
+3. **Build the model ladder** against `data/splits/`. Unblocked now.
+4. **PII scan** the pool (D13) before anything is published.
+5. **Do not touch `data/splits/test.jsonl`** except for the single sanctioned M6 evaluation.

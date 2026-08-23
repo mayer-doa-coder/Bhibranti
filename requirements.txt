@@ -9,18 +9,14 @@
 
 # ---------------------------------------------------------------------------
 # TIER 1 — data pipeline. Needed by every script that exists TODAY:
-#   src/build_bn_pool.py, src/build_pilot.py,
-#   src/build_agreement_test.py, src/audit.py
+#   src/build_bn_pool.py, src/build_corpus.py,
+#   src/build_agreement_test.py, src/score_agreement.py, src/audit.py
 # ---------------------------------------------------------------------------
 numpy==2.4.2
 scipy==1.17.1
 scikit-learn==1.9.0
 pandas==3.0.1
 
-# Transliteration reference tool (guide sec 3.3). src/build_pilot.py uses its
-# own rule-based mapper rather than this, but it is pinned because it is the
-# comparison baseline quoted in data/generated/pilot_v1/README.md.
-indic-transliteration==2.3.82
 
 # ---------------------------------------------------------------------------
 # TIER 2 — model ladder. NOT yet used by any script in src/. Uncomment when
@@ -47,6 +43,12 @@ indic-transliteration==2.3.82
 # matplotlib
 # seaborn
 
-# REQUIRED for BanglaBERT / BanglishBERT — they were pretrained with this
-# normaliser and skipping it costs accuracy (guide sec 6, Arm B):
+# REQUIRED for BanglaBERT — it was pretrained with this normaliser and skipping
+# it costs accuracy (guide sec 6):
 # git+https://github.com/csebuetnlp/normalizer
+
+# ---------------------------------------------------------------------------
+# PHASE 2 ONLY (Banglish). Do not install these during Phase 1.
+# ---------------------------------------------------------------------------
+# indic-transliteration     # transliteration reference
+# bnbphoneticparser         # Avro-style phonetic parsing

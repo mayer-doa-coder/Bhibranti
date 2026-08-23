@@ -6,7 +6,7 @@ gate fails, so this can sit in front of training in a pipeline.
 LABEL CONVENTION (PRD section 5.1a): ``1 = correct/faithful``, ``0 = incorrect/
 hallucinated``.
 
-    python src/audit.py --data data/splits/bn_dev_benchmark
+    python src/audit.py --data data/splits
     python src/audit.py --data data/interim/bn_pool.jsonl --probe metadata
 
 Probes

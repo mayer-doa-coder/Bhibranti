@@ -6,6 +6,10 @@ journal editors will ask.
 
 **Status: sources identified. Two licence questions remain open — see the actions at the bottom.**
 
+> **Phase 1 is Bengali-first as of 2026-08-23.** The Banglish sources listed under "Planned"
+> below are **Phase 2** material and must not be ingested yet. The Phase 1 corpus is
+> `data/corpus/bn_v1/corpus.jsonl`, derived only from the pool registered immediately below.
+
 ---
 
 ## Ingested
@@ -103,7 +107,9 @@ separable.
 | **BanglaTLit-PT** — Kaggle | check dataset page | 243K unlabeled transliterated Bangla; the further-pretraining corpus |
 | **BanglishRev** — arXiv 2412.13161 | check paper | 1.74M Bangla/English/Banglish e-commerce reviews |
 | **MixSarc** — `ajwad-abrar/MixSarc` | check HF card | Naturally-occurring Banglish from Facebook |
-| **অলীকবচন Kaggle** — `kaggle.com/competitions/bengali-hallucination` | **read the rules tab** | PRD Q1/Q2 — competition licence may forbid redistribution |
+| **অলীকবচন Kaggle** — `kaggle.com/competitions/bengali-hallucination` | **read the rules tab** | PRD Q1. A Bengali LLM hallucination-detection competition; a plausible origin of part of this pool. Competition licences often permit competition use only. **Resolve before releasing.** |
+| **BenHalluEval** — arXiv 2605.31483 | check paper | The Bengali hallucination benchmark (12,000 hallucinated candidates, four tasks). Reference point and related work — not a source to ingest. |
+| **TyDiQA-GoldP (Bengali)** | Apache 2.0 (check) | Grounded Bengali QA. The best candidate if has-context data must be scaled — see guide §4. |
 
 ## Models
 

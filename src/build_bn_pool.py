@@ -3,7 +3,9 @@
 Reads the raw vendor files in ``data/raw/bn_qa_pool/`` and produces:
 
   * ``data/interim/bn_pool.jsonl``            — full cleaned pool, schema-mapped
-  * ``data/splits/bn_dev_benchmark/*.jsonl``  — deterministic grouped dev splits
+  * ``data/splits/_pool_sanity/*.jsonl``  — throwaway grouped splits used only to
+    sanity-check this script. The REAL Phase 1 splits are built by
+    ``src/build_corpus.py``, which filters the pool down to answerable items.
 
 SOURCES — the content comes from Bengali Wikipedia (CC BY-SA 4.0) and BCS question
 banks; the QA pairs were built from those texts with LLM assistance. Full register
@@ -38,7 +40,7 @@ from pathlib import Path
 
 RAW_DIR = Path("data/raw/bn_qa_pool")
 INTERIM = Path("data/interim/bn_pool.jsonl")
-SPLIT_DIR = Path("data/splits/bn_dev_benchmark")
+SPLIT_DIR = Path("data/splits/_pool_sanity")
 
 SEED = 42
 NULL_CONTEXT = "[NULL]"

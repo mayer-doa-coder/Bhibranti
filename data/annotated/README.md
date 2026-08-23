@@ -1,51 +1,22 @@
-# `data/annotated/` — post-human-annotation corpus
+# `data/annotated/` — human-labelled data
 
-## `agreement_test_v1/` — ready now: the 100-item guideline check
+## `agreement_test_v1/` — do this first
 
-See **[`agreement_test_v1/README.md`](agreement_test_v1/README.md)**. This is the M2 step:
-two people label the same 100 blind items using `docs/ANNOTATION_GUIDELINES.md`, and the
-agreement between them (Cohen's kappa) tells us whether the guidelines actually work.
+The M2 gate: two people label the same 100 blind items using
+[`docs/ANNOTATION_GUIDELINES.md`](../../docs/ANNOTATION_GUIDELINES.md), and Cohen's kappa between
+them must reach 0.60. See [`agreement_test_v1/README.md`](agreement_test_v1/README.md).
 
-**Do this before anything else below.**
+Nothing else in this folder exists yet.
 
----
+## What goes here later
 
-**Below: what this folder becomes once M2 passes and the full corpus is labeled.**
+Once M2 passes, the labelled corpus lands here — the same records as
+`data/corpus/bn_v1/corpus.jsonl` but with `hallucination_type`, `annotator_1`, `annotator_2`,
+and `adjudicated` filled in by people instead of left `unlabeled`.
 
-Right now, beyond the file above, nothing in this project has been human-annotated.
+Note `difficulty` is **already** set (easy/hard) by `src/build_corpus.py` — it records whether
+the string shortcut separates that pair. Annotators also judge easy/hard independently; the two
+are different signals and both are worth having.
 
-PRD **D4** and **D5** are Must-priority and currently unmet: there is no annotation, so Cohen's
-κ cannot be computed and no test set can be called verified.
-
-## Prerequisites (milestone M2)
-
-- [ ] `docs/ANNOTATION_GUIDELINES.md` written **before** annotation begins (PRD R4). BanTH's
-      Appendix B is the template to imitate — per-category definitions with worked bilingual
-      examples.
-- [ ] 2 annotators minimum (3 preferred), native Bangla speakers fluent in Banglish. Recruit 3,
-      require 2 (RK3).
-- [ ] 100-item pilot annotated → compute κ → revise guidelines → *then* annotate the rest.
-- [ ] A domain expert designated for adjudication.
-
-## Annotation levels (guide §5.3)
-
-| Split | Level |
-|---|---|
-| Test (500) | **100% human, double-annotated, adjudicated** |
-| Dev (500) | 100% human, single annotator + spot check |
-| Train (3,000) | Generator label + human verification on a 20% sample |
-
-If the 20% train sample shows > 5% label noise, verify more.
-
-## Agreement
-
-Report **Cohen's κ** (2 annotators) or **Fleiss' κ** (3+), plus Krippendorff's α as a robustness
-check. Floor is **κ ≥ 0.60**; target 0.70. BanTH reported 0.71 inter-annotator on binary labels.
-
-Below 0.40 means the guidelines are broken, not the annotators. The usual cause is that
-"hallucination" is under-defined for edge cases — partially correct answers, answers that are
-true but not entailed by the context, answers that hedge. Write an explicit rule for each.
-
-Annotators set `label` (**`1` = correct, `0` = hallucinated**), and for **`label=0`** the
-`hallucination_type` from the 6-type taxonomy. The source pool provides **neither** type nor difficulty, so both are annotated from
-scratch here.
+Annotation plan (PRD): test split gets both annotators plus adjudication, dev gets one annotator,
+train gets a 20% spot-check.
