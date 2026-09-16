@@ -1,0 +1,900 @@
+# BangHallu — Project Walkthrough (Phase 1)
+
+**What this file is:** a plain-language explanation of the whole project, step by step — what we
+did, why we did it, how it works, and what came out. It is written so that someone who has never
+seen the code (a teacher, a classmate, or ourselves a month from now) can follow it and explain it.
+
+**Who:** Tawhidul Hasan (2107004) · Md. Saif Ahmed Shejan (2107009)
+**Supervisors:** Dr. K. M. Azharul Hasan · Md. Nazirulhasan Shawon
+**Covers:** the beginning of the project → the current step (merging human annotation into the
+corpus). **Last updated:** 17 September 2026.
+
+> **Keep this file alive.** Each time a step finishes, add a new section in the same format
+> (What / Why / How / Result / Checked?) and update the status table in §2.
+
+Every number in this file was re-measured from the actual data on the date above, not copied from
+older notes. Where an older document had a wrong number, §15 says so.
+
+---
+
+## Contents
+
+1. [The project in one minute](#1-the-project-in-one-minute)
+2. [Where we are — the status table](#2-where-we-are--the-status-table)
+3. [Words you need (glossary)](#3-words-you-need-glossary)
+4. [Step 0 — Choosing the scope: Bengali first](#4-step-0--choosing-the-scope-bengali-first)
+5. [Step 1 — Foundations: one record format, one label rule, fixed seeds](#5-step-1--foundations)
+6. [Step 2 — Getting the raw data and auditing it](#6-step-2--getting-the-raw-data-and-auditing-it)
+7. [Step 3 — Cleaning](#7-step-3--cleaning)
+8. [Step 4 — Building the corpus](#8-step-4--building-the-corpus)
+9. [Step 5 — Measuring difficulty (easy vs hard)](#9-step-5--measuring-difficulty-easy-vs-hard)
+10. [Step 6 — Splitting into train, dev and test](#10-step-6--splitting-into-train-dev-and-test)
+11. [Step 7 — The shortcut audit](#11-step-7--the-shortcut-audit)
+12. [Step 8 — Annotation guidelines and the 100-item agreement test](#12-step-8--annotation-guidelines-and-the-100-item-agreement-test)
+13. [Step 9 — Full human annotation](#13-step-9--full-human-annotation)
+14. [Step 10 (current) — Merging the annotation into the corpus](#14-step-10-current--merging-the-annotation-into-the-corpus)
+15. [Health check — was each step done correctly?](#15-health-check--was-each-step-done-correctly)
+16. [All the parameters in one place](#16-all-the-parameters-in-one-place)
+17. [Questions a teacher is likely to ask](#17-questions-a-teacher-is-likely-to-ask)
+18. [What comes next](#18-what-comes-next)
+
+---
+
+## 1. The project in one minute
+
+**The problem.** AI chatbots (large language models, LLMs) answer Bengali questions fluently and
+confidently — and are sometimes simply wrong. A confidently wrong answer is called a
+**hallucination**. For a student preparing for SSC, HSC or BCS exams this is dangerous: the answer
+*looks* right, so the student memorises a false fact.
+
+**What we build.** A program — a **detector** — that reads:
+
+- a **question**,
+- sometimes a **passage** of text the answer should come from, and
+- a **candidate answer**,
+
+and decides: **is this answer correct (`1`) or hallucinated (`0`)?**
+
+**A real example from our data:**
+
+> **Passage:** এ বিদ্রোহের সঙ্গে জড়িত থাকার অভিযোগে আলাওল **পঞ্চাশ দিন** কারাভোগ করেন …
+> **Question:** শাহ সুজার বিদ্রোহে জড়িত থাকার অভিযোগে আলাওল কতদিন কারাভোগ করেন?
+>
+> | Candidate answer | Detector should say |
+> |---|---|
+> | পঞ্চাশ দিন | `1` correct — the passage says so |
+> | একশ দিন | `0` hallucinated — the passage says fifty, not a hundred |
+
+**What Phase 1 delivers.**
+
+1. A clean, **human-checked Bengali dataset** (we call it the *corpus*) of 4,480 question–answer
+   pairs.
+2. A **ladder of models**, from very simple (word counting) to modern (BERT-style transformers),
+   all tested on that dataset so we can compare them fairly.
+3. A **reproducible pipeline**: anyone can rerun our scripts and get byte-for-byte the same data.
+
+So far we have finished (1) up to the final merge. (2) has not started yet.
+
+---
+
+## 2. Where we are — the status table
+
+| # | Step | Status | Key result |
+|---|---|---|---|
+| 0 | Choose scope: Bengali first, Banglish later | ✅ done | Phase 1 = Bangla script only |
+| 1 | Foundations: schema, label rule, seeds, experiment log | ✅ done | `1 = correct`, seeds 42 / 1337 / 2024 |
+| 2 | Get raw data and audit it | ✅ done | 62,084 raw records, 14 subject files |
+| 3 | Clean | ✅ done | 56,480 records after removing duplicates |
+| 4 | Build the corpus | ✅ done | **4,480 pairs / 8,960 records** |
+| 5 | Measure difficulty | ✅ done | every pair marked easy or hard |
+| 6 | Split into train / dev / test | ✅ done | 3,129 / 673 / 678 pairs, no overlap |
+| 7 | Shortcut audit (the gate) | ✅ passing | metadata probe **0.534** (must be < 0.60) |
+| 8 | Guidelines + 100-item agreement test | ✅ passed | Cohen's κ **0.717** (must be ≥ 0.60) |
+| 9 | Full human annotation | ✅ done | 5,310 rows; test κ **0.865** |
+| 10 | **Merge annotation into the corpus** | 🔶 **current** | tool built and verified; 253 rows await a decision |
+| 11 | Model ladder (N-gram → … → BERT) | ⬜ not started | — |
+| 12 | Final test evaluation (once only) | ⬜ not started | — |
+
+In the project requirements document ([PRD.md](PRD.md)) these are milestones **M0** (steps 0–3),
+**M1** (steps 4–7), **M2** (step 8), **M3** (steps 9–10), **M4–M5** (step 11), **M6** (step 12).
+
+---
+
+## 3. Words you need (glossary)
+
+| Word | Simple meaning |
+|---|---|
+| **Hallucination** | An answer that sounds confident but is wrong or not supported. |
+| **Record** | One row of data: one question + (maybe) a passage + **one** answer + its label. |
+| **Pair** | Two records sharing the same question: one with a correct answer, one with a wrong answer. Our corpus is built entirely out of pairs. |
+| **Label** | The truth for a record. **`1` = correct, `0` = hallucinated.** |
+| **has-context** | A passage is given. Question to ask: *does the passage support this answer?* |
+| **no-context** | No passage (closed-book). Question to ask: *is this answer true?* |
+| **Corpus** | Our final dataset: `data/corpus/bn_v1/corpus.jsonl`. |
+| **Train / dev / test** | Three non-overlapping parts of the corpus: to learn from, to tune on, and to grade once at the end. |
+| **Shortcut** | A cheap trick that predicts the label *without* doing the real task (e.g. "long answers are usually wrong"). A model that learns a shortcut looks good and is useless. |
+| **Probe** | A deliberately dumb model we train to *find* shortcuts. If a dumb model scores well, the data is leaking the answer. |
+| **Macro-F1** | Our main score, from 0 to 1. It averages how well the model does on the "correct" class and on the "hallucinated" class, so it cannot be gamed by always guessing one side. Random guessing ≈ 0.50; always guessing one class = 0.33. |
+| **Annotation** | Humans reading records and writing down their own judgement. |
+| **Cohen's κ (kappa)** | How much two annotators agree **beyond what luck alone would give**. 0 = no better than chance, 1 = perfect. |
+| **Seed** | A fixed starting number for anything random, so the "random" result is the same every time. |
+| **Hallucination type** | *What kind* of wrong a wrong answer is (wrong name, wrong number, …). See §13. |
+| **RAG** | Retrieval-augmented generation: letting a model look facts up. **Forbidden** in this project (§5). |
+
+---
+
+## 4. Step 0 — Choosing the scope: Bengali first
+
+**What.** Phase 1 works only on **Bengali script** (বাংলা হরফ). **Banglish** (Bangla written in
+English letters, e.g. *"Alaol koto din karabhog koren?"*) is postponed to Phase 2.
+
+**Why.** The project originally started with Banglish. To create Banglish data, we converted
+Bengali text using **hand-written letter-by-letter rules**. The output was unreadable even to a
+native Bangla speaker, so the 500-pair pilot built on it had to be thrown away.
+
+Two lessons came out of that:
+
+1. Banglish detection is a *harder problem stacked on top of* Bengali detection. If we cannot
+   detect hallucinations in clean Bengali, we certainly cannot in Banglish. So solve Bengali first.
+2. Phase 2 must use a proper transliteration tool, and a native speaker must read the output
+   before anything is built on it.
+
+**Other scope decisions made at the start** (all in [PRD.md](PRD.md) §3):
+
+| Decision | Reason |
+|---|---|
+| **QA only** — no fill-in-the-blank items | A fill-in-the-blank item trains "copy the missing words", not "check if an answer is right" (§8). |
+| **No subject is removed for being hard** | Law, science, BCS and literature need outside knowledge. Removing them would make the task look easier than it really is. We *measure* difficulty instead (§9). |
+| **No RAG** (no looking things up) | If a model could search for facts, we would be measuring its search engine, not its ability to spot a wrong answer — and the no-context condition would become meaningless. |
+| **No new data collection** | The corpus is final. Effort goes into quality, not quantity. |
+| **Fixed model ladder** | Required by the course: N-gram → Skip-gram/word2vec → BiRNN/BiLSTM → BERT-family. We may add models but not replace these. |
+
+---
+
+## 5. Step 1 — Foundations
+
+Before touching data we fixed four things that must never change later.
+
+### 5.1 One record format (the *schema*)
+
+File: [`configs/schema.json`](../configs/schema.json). Every record has the same fields. The
+important ones:
+
+| Field | Example | Meaning |
+|---|---|---|
+| `id` | `bnp_000651_1` | unique record id |
+| `pair_id` | `bnp_000651` | links the correct and wrong answer of one question |
+| `subject` | `history` | topic |
+| `condition` | `has_context` | passage given or not |
+| `context` | "এ বিদ্রোহের সঙ্গে…" | the passage (empty for no-context) |
+| `question` | "…আলাওল কতদিন কারাভোগ করেন?" | the question |
+| `candidate_answer` | "একশ দিন" | the answer being judged |
+| `label` | `0` | **the truth** (1 correct, 0 hallucinated) |
+| `difficulty` | `easy` / `hard` | see §9 |
+| `hallucination_type` | `numeric` | kind of error (see §13) |
+| `annotator_1`, `annotator_2` | `0`, `0` | what each human said |
+
+**Why freeze it?** Every script reads these fields. If one script renamed a field, everything
+downstream would silently break. Fields may be *added*, never renamed or removed. Some fields
+(`cmi`, `script_condition`, `error_span`) are there only for Phase 2 — we fill them now so we do
+not have to rebuild later.
+
+### 5.2 One label rule, everywhere
+
+> **`1` = correct. `0` = hallucinated.**
+
+Many research papers use the opposite (1 = hallucinated). We kept `1 = correct` because our source
+files already used it, so **no label is ever flipped anywhere** — flipping in one place and
+forgetting in another is one of the most common and hardest-to-notice bugs in this kind of work.
+
+### 5.3 Fixed random seeds: 42, 1337, 2024
+
+Shuffling, sampling and model training all use randomness. Fixing the seed means rerunning a script
+gives *exactly* the same output. Every model will be trained three times (once per seed) and we
+report the average ± spread, so one lucky run cannot mislead us.
+
+### 5.4 One experiment log
+
+[`results/experiment_log.csv`](../results/experiment_log.csv) records **every** run — including
+failures — with its date, settings, seed and score. It currently has 12 rows (audits, baselines and
+the two κ measurements).
+
+---
+
+## 6. Step 2 — Getting the raw data and auditing it
+
+**What.** The starting material is `data/raw/bn_qa_pool/`: **14 files, one per subject, 62,084
+records**, each shaped like `{context, prompt_bn, response_bn, label}`.
+
+| Subject file | Records | | Subject file | Records |
+|---|---:|---|---|---:|
+| mathematics | 29,332 | | science | 4,000 |
+| grammar | 5,000 | | bcs | 2,324 |
+| history | 5,000 | | antonym / idiom_meaning / vocabulary | 2,000 each |
+| reading_comprehension | 5,000 | | geography | 1,741 |
+| law | 1,383 | | synonym | 1,000 |
+| literature | 914 | | others | 390 |
+
+**Where it comes from.** The text comes from **Bengali Wikipedia** (licence CC BY-SA 4.0) and **BCS
+question banks**. The question–answer pairs were built from those texts with LLM assistance.
+Details and two unresolved licence questions are in [`data/SOURCES.md`](../data/SOURCES.md).
+
+**Why audit before using it?** You cannot trust a dataset you have not measured. The full audit is
+[`data/DATASET_AUDIT.md`](../data/DATASET_AUDIT.md). What it established:
+
+| Finding | Evidence | Consequence |
+|---|---|---|
+| **Label meaning confirmed: `1` = correct** | In has-context records, 78.6% of label-1 answers appear word-for-word in the passage vs only 6.9% of label-0 answers; spot checks agree (২৬ মার্চ = national day ✓, ১৬ ডিসেম্বর ✗) | no flipping needed (§5.2) |
+| It really is Bengali script | Latin letters are only 0.96% of all letters | fits Phase 1 |
+| Heavily unbalanced subjects | mathematics is 47% of all records | a subject cap is needed (§8) |
+| Mostly closed-book | 80% of records have no passage | has-context data is the scarce resource |
+| **Duplicates** | 5,536 exact duplicates (8.9%) | must be removed (§7) |
+| **A severe shortcut exists** | correct answers are usually copied from the passage, wrong ones are not | must be measured and reported (§9, §11) |
+
+---
+
+## 7. Step 3 — Cleaning
+
+**Script:** [`src/build_bn_pool.py`](../src/build_bn_pool.py) → **Output:**
+`data/interim/bn_pool.jsonl`
+
+**What it does.**
+
+1. Converts each raw record into our schema (§5.1).
+2. Removes **5,536 exact duplicates** — the same record appearing twice.
+3. Removes **68 contradictory records** — identical text carrying *both* label 1 and label 0 (the
+   data disagrees with itself, so neither copy can be trusted).
+
+**Result:** 62,084 − 5,536 − 68 = **56,480 clean records**.
+
+**Why duplicates matter so much.** If the same question sits in both the training data and the test
+data, a model can score well by *remembering* it instead of *reasoning* about it. That is called
+**leakage**, and it produces scores that look great and mean nothing.
+
+---
+
+## 8. Step 4 — Building the corpus
+
+**Script:** [`src/build_corpus.py`](../src/build_corpus.py) → **Output:**
+`data/corpus/bn_v1/corpus.jsonl` and `data/splits/`
+
+### 8.1 Why pairs?
+
+The corpus is made of **pairs**: for each question, exactly one correct answer and one wrong answer.
+
+This guarantees a perfect **50/50 balance** of labels, and — more importantly — it forces the model
+to judge the *answer*. With pairs, the question alone tells you nothing about the label, because
+every question appears once with each label.
+
+### 8.2 The funnel — how 56,480 records became 4,480 pairs
+
+| Stage | Pairs | Removed | Why |
+|---|---:|---:|---|
+| Complete pairs in the clean pool | 16,915 | — | records without a partner answer cannot form a pair |
+| − fill-in-the-blank questions | | 816 | **QA only.** A string matcher already scores 0.929 on them; they teach copying, not checking |
+| − OCR-damaged text | | 8 | broken vowel signs (e.g. "বিষয়ের ি") — unreadable, so un-labelable |
+| − question copied from its own passage (6+ words in a row) | | 1 | such a question gives its own answer away |
+| After validity filters | 16,090 | | |
+| − repeated question text | | 159 | one copy could land in train and the other in test = leakage |
+| **Available** | **15,931** | | 2,688 has-context, 13,243 no-context |
+| **Selected into the corpus** | **4,480** | | all 2,688 has-context + 1,792 no-context |
+
+**Removing fill-in-the-blank also removed `geography` completely** — every geography item was
+fill-in-the-blank. That is a consequence of the task rule, not a judgement that geography is too
+hard.
+
+**What is deliberately *not* removed:**
+
+- **Hard subjects.** An earlier version filtered out ~4,150 "hard to verify" pairs (law, science,
+  BCS, literature). We **reversed** that decision: removing hard items would make the benchmark
+  easier than reality. Those four subjects now make up **966 pairs (21.6%)**.
+- **Pairs where the wrong answer is *also* copied from the passage.** These are exactly the pairs
+  a string-matching trick cannot solve (§9), so they are the most valuable ones.
+
+### 8.3 Composition rules
+
+| Rule | Value | Why |
+|---|---|---|
+| has-context : no-context | **60 : 40** (2,688 : 1,792 pairs) | The grounded task is the main one, but closed-book matters too. Has-context data is scarce, so *all* of it is used. |
+| Label balance | **50 : 50** (exact) | guaranteed by pairs |
+| Max share of one subject | **50%** in has-context, **30%** in no-context | Without a cap, mathematics (59% of the no-context pool) would turn the benchmark into an arithmetic test. Has-context gets a looser cap because its two biggest subjects (reading comprehension, history) are the same kind of task and the data is scarce. |
+
+### 8.4 What the corpus looks like
+
+| Condition | Subjects (pairs) |
+|---|---|
+| **has-context** (2,688) | reading_comprehension 1,261 · history 880 · law 228 · grammar 169 · others 150 |
+| **no-context** (1,792) | bcs 212 · antonym 212 · mathematics 211 · grammar 211 · idiom_meaning 211 · science 211 · literature 211 · law 104 · vocabulary 103 · synonym 73 · history 33 |
+
+13 subjects in total. Passages have a median length of 266 characters (longest: 3,132). Questions
+have a median of 54 characters; answers a median of 16.
+
+**Reproducible:** running the script again produces byte-identical files (re-verified by SHA-256
+hash on 17 September 2026).
+
+---
+
+## 9. Step 5 — Measuring difficulty (easy vs hard)
+
+### 9.1 The problem: a string-matching shortcut
+
+In the source data, correct answers are usually **copied straight out of the passage**, and wrong
+answers usually are not. So this dumb rule —
+
+> *"If the answer's text appears in the passage, say correct; otherwise say wrong."*
+
+— already scores **macro-F1 = 0.812** on all has-context records, **without understanding anything**.
+
+That means a real model scoring 0.82 has learned almost nothing beyond string matching. We need a
+way to see past this.
+
+### 9.2 The solution: mark every pair easy or hard
+
+**has-context pairs:**
+
+- **Easy** = the string rule *separates* the two answers (one appears in the passage, the other
+  does not). The shortcut works.
+- **Hard** = the string rule *cannot* separate them (both appear in the passage, or neither does).
+  The model must actually read.
+
+> **Hard example (from train):**
+> **Passage:** কান্তনগর মন্দিরের নির্মাণ **১৭০৪** সালে শুরু হয় এবং **১৭৫২** সালে সম্পন্ন হয়।
+> **Question:** কান্তনগর মন্দিরের নির্মাণ কাজ কত সালে শুরু হয়?
+> Correct: ১৭০৪ সাল · Wrong: ১৭৫২ সাল
+> **Both years are in the passage**, so "does it appear?" is useless. Only understanding *শুরু*
+> (start) vs *সম্পন্ন* (finish) gives the answer.
+
+**no-context pairs** (no passage, so the string rule does not apply):
+
+- **Hard** = the wrong answer is a **near-miss** — at least 60% similar in characters to the
+  correct one.
+- **Easy** = the wrong answer is obviously different.
+
+> **Hard example:** ‘প্রত্যাবর্তন’ শব্দের সন্ধি বিচ্ছেদ কী? Correct: প্রতি + আবর্তন · Wrong: প্রতি + আবর্তণ
+> **Easy example:** জসীম উদ্‌দীনকে কোন অভিধায় ভূষিত করা হয়? Correct: পল্লিকবি · Wrong: ভোরের পাখি
+
+### 9.3 Result
+
+| Condition | Hard pairs | Easy pairs |
+|---|---:|---:|
+| has-context | 927 (34%) | 1,761 (66%) |
+| no-context | 407 (23%) | 1,385 (77%) |
+
+And the string-matching rule on has-context **records**:
+
+| Slice | Records | String-matcher macro-F1 | What it tells us |
+|---|---:|---:|---|
+| All has-context | 5,376 | **0.812** | the number to beat, but it is inflated |
+| Easy | 3,522 | 0.980 | the shortcut solves these almost perfectly |
+| **Hard** | **1,854** | **0.456** | **worse than guessing** — the shortcut is useless here |
+
+**Why this matters for the whole project:** our target is **macro-F1 ≥ 0.80 on the hard subset**,
+not on all items. Every has-context score we ever report will have 0.812 and 0.456 written next to
+it, so no one (including us) can be fooled by the shortcut.
+
+**Why difficulty is *measured* and not *filtered*:** we keep both easy and hard items and report
+them separately. The *gap* between easy and hard is itself one of the findings.
+
+---
+
+## 10. Step 6 — Splitting into train, dev and test
+
+### 10.1 Why three parts? (the exam analogy)
+
+| Part | Analogy | Used for | How often |
+|---|---|---|---|
+| **Train** (70%) | the textbook | the model learns from it | constantly |
+| **Dev** (15%) | practice tests | choosing settings, comparing models, catching mistakes | as often as needed |
+| **Test** (15%) | the final exam | the one honest score reported at the end | **exactly once** |
+
+If you practise on the final exam paper, your final score no longer measures anything. Every
+decision made after looking at the test set "uses up" a little of its honesty. That is why
+`test.jsonl` is locked until the very last step.
+
+### 10.2 The result
+
+| Split | Pairs | Records | has-context share |
+|---|---:|---:|---:|
+| train | 3,129 | 6,258 | 60.1% |
+| dev | 673 | 1,346 | 59.7% |
+| test | 678 | 1,356 | 59.9% |
+
+### 10.3 How the split was done — and why it is done that way
+
+1. **Split by pair, never by record.** If we split records, the correct answer to a question could
+   land in train and its wrong answer in test. The model could then "remember" the question from
+   training and score without judging anything. Both answers of a question always go to the same
+   split.
+2. **Split inside each (condition, subject) group.** Each group — e.g. "has-context history" — is
+   shuffled and cut 70/15/15 on its own. That is why all three splits have the same 60/40
+   condition mix and the same subject mix, so dev and test are fair miniatures of train.
+3. **Fixed seed 42**, so the split is identical every time.
+
+**Verified:** 0 pairs and 0 identical question texts are shared between any two splits.
+
+---
+
+## 11. Step 7 — The shortcut audit
+
+**Script:** [`src/audit.py`](../src/audit.py) · **This is a blocking gate:** if it fails, nothing
+built on the data can be trusted.
+
+**The idea.** Before trusting any clever model, we train deliberately *stupid* models that are
+forbidden from seeing the real content. If one of them scores well, the data is giving the answer
+away through some side channel, and a real model would learn that side channel too.
+
+| Probe | What it is allowed to see | Score | Verdict |
+|---|---|---:|---|
+| **Metadata-only** (the gate) | only surface features of the answer: word count, character count, average word length, share of Latin letters, counts of `, . ? ! "`, share of digits, share of capitals | **0.534** | ✅ **PASS** (must be < 0.60; < 0.55 counts as "clean") |
+| Answer-only character n-grams | the answer text, but no question and no passage | 0.542 | mild signal only — good |
+| String matcher | "is the answer in the passage?" | 0.812 | the shortcut from §9 — reported, not hidden |
+| Majority class | always predicts the same label | 0.333 | sanity floor |
+
+**How to read 0.534:** a model that only sees the *shape* of the answer — how long it is, whether it
+has digits — does only slightly better than a coin flip (0.50). So the label is **not** leaking
+through answer length or formatting.
+
+**Why 0.60 and why it can never be relaxed.** If we loosened the threshold, removed features, or
+changed the split just to make the gate pass, we would be hiding the exact problem the gate exists
+to catch. If it ever fails, the data gets fixed and rebuilt — never the gate.
+
+The audit is rerun after every change to the corpus. It was last rerun on 17 September 2026:
+still **0.534, PASS**.
+
+---
+
+## 12. Step 8 — Annotation guidelines and the 100-item agreement test
+
+### 12.1 Why humans at all?
+
+The labels came with the source data, which was built with LLM help. A hallucination detector
+trained on labels nobody checked might just learn the mistakes of whatever produced them. Humans
+verify the labels and add the error type.
+
+But humans disagree too — so before annotating thousands of rows, we must prove that **two people
+following the same rules reach the same answer**. Otherwise the "human labels" are just one
+person's opinion.
+
+### 12.2 The guidelines
+
+File: [`docs/ANNOTATION_GUIDELINES.md`](ANNOTATION_GUIDELINES.md), written **before** annotation
+began.
+
+**The one question:** *is this answer correct or wrong?* — asked differently for each condition:
+
+| Condition | Ask | May you look it up? |
+|---|---|---|
+| has-context | "Does **this passage** support the answer?" (not "is it true in real life?") | **No.** An outside source cannot tell you what the passage says. |
+| no-context | "Is this answer true?" | **Yes**, and note that you checked. |
+
+If an item genuinely cannot be labelled (broken text, the passage does not answer the question),
+the annotator writes **`unsure`** instead of guessing. `unsure` items are left out of κ and reported
+by subject.
+
+The guidelines contain **15 rules** for confusing cases, for example:
+
+- **Rule 1** — different words, same meaning = still correct (এবং vs ও).
+- **Rule 2** — right topic, wrong fact = wrong (বিজারক vs জারক).
+- **Rule 3** — partly correct = wrong.
+- **Rule 11–15** — added *after* the agreement test, from the cases where we actually disagreed
+  (e.g. the passage does not answer the question; ignore `[1]` citation marks; শাব্দিক অর্থ means
+  the literal meaning).
+
+### 12.3 The agreement test (milestone M2)
+
+**Script:** [`src/build_agreement_test.py`](../src/build_agreement_test.py) → 100 items.
+
+**How it was designed.** The 100 items copy the corpus's mix: 60 has-context / 40 no-context, 50
+correct / 50 wrong, and about the corpus's share of hard items. Both annotators labelled
+**independently and blind** — no answer key, no comparing.
+
+**Results** ([IAA report](../data/annotated/agreement_test_v1/IAA_REPORT.md)):
+
+| Measure | Value |
+|---|---|
+| Items scored | 92 of 100 (8 marked `unsure`) |
+| Raw agreement | 79 / 92 = 85.9% |
+| **Cohen's κ** | **0.717** ✅ (needed ≥ 0.60) |
+
+### 12.4 How Cohen's κ works (with our numbers)
+
+Raw agreement flatters. On a yes/no task where both people say "yes" about half the time, they will
+agree about **50% of the time by pure luck**.
+
+κ removes that luck:
+
+```
+κ = (observed agreement − chance agreement) / (1 − chance agreement)
+```
+
+With our pilot: observed = 0.859, chance ≈ 0.502
+
+```
+κ = (0.859 − 0.502) / (1 − 0.502) = 0.357 / 0.498 ≈ 0.717
+```
+
+Read it as: *"of all the agreement that was possible beyond luck, we achieved 72% of it."*
+
+| κ | Common interpretation (Landis & Koch) |
+|---|---|
+| < 0.40 | poor to fair — the guidelines are broken |
+| 0.41 – 0.60 | moderate |
+| **0.61 – 0.80** | **substantial** ← pilot, 0.717 |
+| **0.81 – 1.00** | **almost perfect** ← full test split, 0.865 (§13) |
+
+### 12.5 What the 8 `unsure` items taught us
+
+They were **defects in the data**, not annotator weakness: three `law` items where the passage did
+not actually answer the question, two where the answer type did not match the question (asked
+*when*, answered with a biography), and three with broken text. Measured across the corpus, this
+kind of passage mismatch affects roughly 1% of has-context items.
+
+---
+
+## 13. Step 9 — Full human annotation
+
+### 13.1 What gets annotated, and how much
+
+| Part | What | Who | Why this much |
+|---|---|---|---|
+| **test** (1,356 records) | **100%**, twice | **both** annotators, independently and blind | the final score is computed on it, so it must be as trustworthy as possible |
+| **dev** (1,346) | 100% | one annotator | used for all tuning decisions |
+| **train** (1,252 of 6,258) | a **20% random sample** (626 pairs) | one annotator | models tolerate a little noise in training data; the sample tells us whether train is sound |
+
+### 13.2 The annotation sheets and the traps they avoid
+
+**Script:** [`src/build_annotation_sheets.py`](../src/build_annotation_sheets.py) → spreadsheets in
+`data/annotated/round1/`, 250 rows per file, 6 files per set.
+
+Each row asks for: `your_label` (correct / wrong / unsure / unreadable), `your_type`,
+`your_difficulty`, `your_notes`.
+
+Every safeguard exists because the problem actually happened or was measured:
+
+| Trap | What could go wrong | Guard |
+|---|---|---|
+| The id gives away the answer | corpus ids end in `_0` / `_1`, which reveals the label | sheets use neutral ids (`test_0001`); the link back is in a private mapping file annotators never open |
+| Pair partners side by side | you judge by comparing the two answers instead of judging each one | rows are shuffled so partners are never adjacent |
+| Pre-filled answers on test | the `type` column is `none` exactly when the answer is correct — pre-filling it would reveal the label | **test is never pre-filled** |
+| Rubber-stamping pre-filled rows | on dev/train, an annotator could just click through | 10% of pre-filled rows are left **blank** as an attention check |
+| Excel damage | Excel drops a leading `'`, rewrites Bengali digits, and runs `-1/4` as a formula | comparisons ignore those changes; formula-like cells are protected |
+| Overwriting finished work | rebuilding the sheets once destroyed partial work | the builder refuses to overwrite filled sheets |
+
+dev and train sheets arrived **90% pre-filled** (the corpus label plus a type where a simple rule
+could decide it), to save time. The annotator **verified and corrected** them.
+
+### 13.3 The hallucination types
+
+For every **wrong** answer, the annotator picks a type:
+
+| Condition | Type | Meaning | Example |
+|---|---|---|---|
+| has-context | `entity` | wrong person, place or organisation | passage says জিম্বাবুয়ে, answer says নিউজিল্যান্ড |
+| has-context | `numeric` | wrong number, date or quantity | ১৭৭৪ vs ১৭৭৫ |
+| has-context | `relational` | right things, wrong relationship | who seized vs who was detained swapped |
+| has-context | `contradiction` | says the opposite of the passage | বিজারক vs জারক |
+| no-context | `fabricated` | simply not true | — |
+| no-context | `overclaim` | confidently answers something that has no fixed answer | — |
+| (correct answers) | `none` | — | — |
+
+**Why types?** A single score hides *what kind* of mistake a model misses. Types let us later report
+"the model catches wrong numbers but misses scrambled relationships". Types are for **reporting
+only** — a model never sees them, because they reveal the label.
+
+### 13.4 Results
+
+**All four sets are complete: 5,310 rows.** A validator
+([`src/validate_annotation.py`](../src/validate_annotation.py)) checked every row:
+
+| Check | Result |
+|---|---|
+| Structural errors (invalid label, type in wrong column, type not allowed for the condition) | **0** |
+| Question/answer text changed or copied from the wrong row | **0** of 5,310 |
+| Same item appearing in two splits | **0** |
+| `unsure` / `unreadable` rows without an explanation | **0** of 191 |
+| Pre-filled rows actually reviewed? | yes — **23%** (dev) and **26%** (train) were corrected |
+
+**Test split agreement** ([`src/score_test_agreement.py`](../src/score_test_agreement.py)):
+
+| Measure | Value |
+|---|---|
+| Items both annotators could label | 1,270 of 1,356 (86 marked `unsure`/`unreadable` by at least one) |
+| Raw agreement | 1,184 / 1,270 = **93.2%** |
+| **Cohen's κ** | **0.865** — "almost perfect", higher than the 0.717 pilot |
+| Tawhid vs corpus label | 91.1% match |
+| Shejan vs corpus label | 96.9% match |
+| Agreement: has-context / no-context | 90% / 97% |
+| Agreement: easy / hard | 95% / 88% |
+
+Hard items agree less than easy ones — the expected direction. The rise from 0.717 to 0.865 shows
+the new rules 11–15 worked.
+
+**Is the annotation genuine?** Yes, and it can be shown: the two test annotators' sheets share 0
+identical full rows and 0 identical notes despite 93% label agreement, and a quarter of pre-filled
+dev/train rows were corrected rather than accepted.
+
+> **Transparency note.** An LLM-assisted helper (`src/llm_annotate.py`) was written but **never
+> run**. Every label in `data/annotated/round1/` was entered by a human.
+
+---
+
+## 14. Step 10 (current) — Merging the annotation into the corpus
+
+### 14.1 The problem this step solves
+
+After step 9 the human judgements live in **spreadsheets**. The corpus files that models will read
+still say `hallucination_type = unlabeled` everywhere. The merge copies the human results into
+`corpus.jsonl` and the three split files.
+
+(An earlier merge script could only read the output of the unused LLM helper and had no way to
+read these spreadsheets. It was rewritten on 17 September 2026.)
+
+**Script:** [`src/merge_annotation.py`](../src/merge_annotation.py)
+
+```bash
+python src/merge_annotation.py --dry-run     # show what would happen; change nothing
+python src/merge_annotation.py               # write it (refuses while decisions are missing)
+python src/audit.py --data data/splits       # always re-check the gate afterwards
+```
+
+### 14.2 The rules it follows
+
+**Two things it will never change:**
+
+1. **`label`.** If a human disagrees with the corpus label, the disagreement is **recorded** in
+   `label_disputes.csv` — the label is *not* edited. The label is what every model is graded
+   against; quietly changing it from a spreadsheet would change the exam after it was set. A
+   genuinely wrong label must be fixed at its source and the corpus rebuilt.
+2. **`difficulty`.** The corpus defines difficulty by a *rule* (§9). The guidelines asked annotators
+   for their *feeling* of difficulty ("is it a believable near-miss?"). Those are different
+   measurements, and they disagree on about 40% of rows — which is expected, not an error.
+
+**How a type is decided:**
+
+| Record | Result | `type_source` written |
+|---|---|---|
+| correct answer (label 1) | `none` | `definitional` |
+| test, wrong answer, **both** annotators said wrong **and** chose the **same** type | that type | `double_annotated` |
+| dev/train, wrong answer, the annotator said wrong and chose a type | that type | `single_annotated` |
+| anything else (types differ, someone said correct, someone was unsure) | goes to **adjudication** | `awaiting_adjudication` → `adjudicated` once decided |
+| train record outside the 20% sample | `unlabeled` | `not_annotated` |
+
+It also fills `annotator_1` / `annotator_2` (each human's 1/0, or empty for unsure) and
+`adjudicated`.
+
+**Adjudication** means a third look to settle a disagreement. The script writes
+`data/annotated/round1/adjudication.csv`; for each row a person writes a type, `skip`, or `dispute`
+(= "I think the corpus label itself is wrong"). Decisions are kept even if the script is rerun.
+
+### 14.3 What the dry run shows (17 September 2026)
+
+| Split | Wrong answers | Type settled by humans | Waiting for adjudication | Never sampled |
+|---|---:|---:|---:|---:|
+| test | 678 | 487 (71.8%) | 191 | — |
+| dev | 673 | 648 (96.3%) | 25 | — |
+| train | 3,129 | 589 (18.8%) | 37 | 2,503 |
+| **total** | **4,480** | **1,724 (38.5%)** | **253** | **2,503** |
+
+Why test needs the most adjudication: two people must agree on *both* the label *and* the type.
+Of the 191: 81 have different types (mostly `relational` vs `entity`), 49 are correct-vs-wrong
+splits, 45 involve `unsure`, and in 16 both annotators said the "wrong" answer is actually correct.
+
+**Types so far** (the 1,724 settled):
+
+| Condition | Distribution |
+|---|---|
+| has-context | numeric 436 · entity 218 · contradiction 167 · relational 132 |
+| no-context | fabricated 771 · **overclaim 0** |
+
+`overclaim` was never chosen. Our no-context questions all have a fixed, factual answer, so this is
+a finding about the dataset, not a mistake.
+
+**Label disputes:** **222 records** where at least one human disagrees with the corpus label;
+in **116** of them every annotator who looked disagrees. Most often the corpus calls an answer
+correct and the humans call it wrong (79 of the 116).
+
+**Is the training data still trustworthy?** The plan's rule ([guide §5.3](IMPLEMENTATION_GUIDE.md))
+says: *if the 20% sample shows more than 5% label noise, verify more.* The train sample shows
+**3.3%** (40 disputed of 1,203 decidable rows), and dev shows the same rate. So, by our own
+pre-set rule, the train labels are sound. Some errors do remain in the unchecked 80% — for example
+this train pair nobody sampled:
+
+> **Question:** চিত্তভূষণ দাশগুপ্ত কবে জন্মগ্রহণ করেন? (passage gives *৬ জুন ১৯১৫*)
+> Marked correct: "২০১৪ সালে তার জন্মের শতবর্ষ পালিত হয়।" · Marked wrong: "৬ জুন ১৯১৫"
+> The labels are swapped. Errors like this are why we measure the noise rate instead of assuming
+> zero.
+
+### 14.4 How the merge was verified
+
+The write path was tested on a **copy** of the data, never the real files:
+
+| Test | Result |
+|---|---|
+| Refuses to write while adjudication rows are empty | ✅ |
+| Rejects an invalid decision (a has-context type on a no-context item) | ✅ |
+| Keeps an adjudicator's decision and notes across reruns | ✅ |
+| Running twice gives byte-identical files | ✅ |
+| Labels changed | **0** of 8,960 |
+| Difficulty changed | **0** of 8,960 |
+| Split files still identical to the corpus rows | ✅ |
+| `label 1 ⇔ type none` rule | 0 violations |
+| Shortcut gate after merging | still **0.534 PASS** |
+
+### 14.5 What is left in this step
+
+1. **Adjudicate** the 253 rows in `adjudication.csv`.
+2. **Run the merge** for real, then rerun the audit.
+3. **Decide about the 2,503 unsampled train rows**: leave their *type* `unlabeled` (their *labels*
+   are fine, §14.3), annotate more, or fill them with LLM-proposed types that are clearly marked
+   `llm_consensus` and never described as human work.
+
+---
+
+## 15. Health check — was each step done correctly?
+
+Each step was compared with what [PRD.md](PRD.md) and
+[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) require, then re-measured.
+
+| Step | Requirement | Verified | Verdict |
+|---|---|---|---|
+| 0 Scope | Bengali only; QA only; no RAG; no new data | no Banglish records; 0 fill-in-the-blank; no retrieval code exists | ✅ |
+| 1 Foundations | frozen schema; `1 = correct`; fixed seeds; log | schema validated at build; no flip in any script; log has 12 rows | ✅ |
+| 2 Audit | source audited before use | `DATASET_AUDIT.md` complete | ✅ |
+| 3 Cleaning | duplicates removed | 62,084 → 56,480 reconciles exactly | ✅ |
+| 4 Corpus | D1 ≥ 4,000 pairs · D2 60/40 · D3 50/50 · D6 no difficulty filter | 4,480 · 2,688/1,792 · exact · 13 subjects | ✅ |
+| 5 Difficulty | D9 every pair easy/hard | 8,960 of 8,960 marked; 0.812 / 0.980 / 0.456 reproduced | ✅ |
+| 6 Splits | D7 pairs never split; R6 deterministic | 0 shared pairs, 0 shared questions; byte-identical rebuild | ✅ |
+| 7 Audit gate | V1 metadata probe < 0.60 | 0.534 | ✅ |
+| 8 Pilot | D5 κ ≥ 0.60; R4 guidelines first | 0.717; guidelines predate annotation | ✅ |
+| 9 Annotation | D4 test 100% double-annotated | 1,356 × 2, κ 0.865, 0 validation errors | ✅ (adjudication pending) |
+| 10 Merge | D8 type for every wrong answer | tool verified; 38.5% settled; not yet written | 🔶 in progress |
+
+### 15.1 Problems found and fixed on 17 September 2026
+
+| # | Problem | Fix |
+|---|---|---|
+| 1 | `merge_annotation.py` could not read the human sheets at all | rewritten (§14) |
+| 2 | `build_corpus.py` description claimed fill-in-the-blank and geography were *included* | corrected |
+| 3 | `data/splits/README.md` listed wrong record counts (8,044 / 1,732 / 1,740) | → 6,258 / 1,346 / 1,356 |
+| 4 | Guide said dev has 599 pairs | → 673 |
+| 5 | PRD and guide said the hard subset has 1,600 records | → 1,854 (the 0.456 score was right) |
+| 6 | Hard subjects quoted as 965 pairs / 21.5% | → 966 / 21.6% |
+| 7 | "mathematics supplies 76% of the no-context pool" | → 59% (measured) |
+| 8 | Guide said median passage length is 295 characters | → 266 in the corpus |
+| 9 | `audit.py` warned "no Banglish records" — a leftover from the old Banglish-first plan | now checks for *non-Bengali* records instead |
+| 10 | round1 README said 86 disagreements were 6.3% of 1,356 | → 6.8% of the 1,270 scored |
+| 11 | test κ 0.865 was never written to the experiment log | added as `iaa_002` |
+| 12 | Guide §5.3 still quoted planned sizes (500 / 500 / 3,000) | → actual sizes, plus the measured 3.3% noise rate |
+
+### 15.2 Known issues still open (not errors in finished work, but must be resolved)
+
+| Issue | Where | Must be settled by |
+|---|---|---|
+| Two licence questions (BCS source; licence of the released corpus). `LICENSE` says MIT, which likely cannot apply to CC BY-SA content | `data/SOURCES.md` | before the repo or corpus is made public |
+| Which LLM built the original QA pairs is unrecorded (`generator_model = claude_version_unrecorded`); `level` (SSC/HSC/BCS) is `unknown` for all records | PRD Q4 | report honestly as a limitation |
+| Guide suggests `max_length = 512`; PRD/cheat-sheet use `256` | guide §7.3 | decide at the start of step 11 |
+| Guide's further-pretraining corpora are *Banglish* datasets (Phase 2 material) | guide §8.2 | choose unlabeled **Bengali** text at step 11 |
+| Guide suggests 5-fold cross-validation on train+dev, while the splits are fixed | guide §7.4 | decide at step 11 |
+| Guide's "human-written holdout" is impossible: every record is LLM-assisted | guide §9.2 | drop or redesign at step 11 |
+
+---
+
+## 16. All the parameters in one place
+
+### 16.1 Data building
+
+| Parameter | Value | Where | Why this value |
+|---|---|---|---|
+| Random seed | **42** (models: 42, 1337, 2024) | every script | reproducibility |
+| has-context : no-context | **60 : 40** | `build_corpus.py` | main task is grounded; has-context data is scarce, so all of it is used |
+| Label balance | **50 : 50** | by construction (pairs) | macro-F1 and κ behave cleanly on balanced data |
+| Max subject share | **50%** has-context, **30%** no-context | `build_corpus.py` | stop mathematics (and similar) from dominating |
+| Split | **70 / 15 / 15** train/dev/test, by pair, per (condition, subject) | `build_corpus.py` | enough to learn from; dev and test big enough to measure (≈ 1,350 records each) |
+| Copied-question filter | **≥ 6** consecutive words from the passage | `build_corpus.py` | a question that contains its own answer is invalid |
+| no-context "near-miss" (hard) | character similarity **≥ 0.60** | `build_corpus.py` | wrong answer close enough to be believable |
+| Fill-in-the-blank detector | `শূন্যস্থান`, `___`, `....` | `build_corpus.py` | QA only |
+
+### 16.2 Audit and gates
+
+| Parameter | Value | Why |
+|---|---|---|
+| Metadata probe gate | **< 0.60** (< 0.55 = clean) | above 0.60 the answer's shape alone predicts the label |
+| Probe train/test split | 80 / 20, grouped by pair | same leakage protection as the real splits |
+| κ gate | **≥ 0.60** | "substantial" agreement; below it the guidelines need work |
+| Leakage alarm | any macro-F1 **> 0.95** | too good to be true on this task |
+| Label-noise rule for train | verify more if **> 5%** | measured: 3.3% |
+
+### 16.3 Annotation
+
+| Parameter | Value | Why |
+|---|---|---|
+| Pilot size | **100** items (60 has-context / 40 no-context, 50/50) | enough to estimate κ, cheap enough to repeat |
+| Rows per sheet | **250** | small enough to open, finish and save safely |
+| Train sample | **20%** (626 pairs) | enough to measure noise without labelling everything |
+| Pre-filled share (dev/train) | **90%**, with **10%** blank attention checks | saves time; blanks detect click-through |
+| Test pre-fill | **none** | pre-filling the type reveals the label |
+
+### 16.4 Model training (planned — step 11, not used yet)
+
+| Parameter | Value | Plain meaning |
+|---|---|---|
+| Learning rate | 2e-5 | how big each learning step is; small, because the model is already pretrained |
+| Optimizer | AdamW | the standard update method for transformers |
+| Max length | 256 tokens | longest input kept; long passages are cut (cut the passage, never the question/answer) |
+| Epochs | 5 | passes over the training data |
+| Batch size | 32 (16 if memory runs out) | examples processed together |
+| Warm-up | 10% | start with tiny steps, then speed up |
+| Weight decay | 0.01 | mild penalty that discourages over-fitting |
+| Early stopping | stop if dev loss does not improve for 2 epochs | avoids memorising train |
+| fp16 | on | half-precision numbers — faster, less GPU memory |
+
+---
+
+## 17. Questions a teacher is likely to ask
+
+**"Your has-context score is 0.82. Isn't that good?"**
+No. A string matcher with no learning gets 0.812. That is why we report the **hard subset**
+(string matcher 0.456) next to every has-context number, and why our target is 0.80 *on the hard
+subset*.
+
+**"Why is the test set used only once?"**
+Every time a result on the test set influences a decision, the test set is partly "learned" by us,
+and the final score stops being an honest estimate. We tune on dev as much as we like, and grade on
+test once.
+
+**"Why not split records randomly?"**
+Then a question's correct answer could be in train and its wrong answer in test, and the model
+could win by remembering questions. We split by pair; 0 pairs and 0 questions are shared across
+splits.
+
+**"The data was built with LLM help. Isn't that circular?"**
+It is a real concern, which is why (a) humans independently checked all of test and dev and a 20%
+sample of train, (b) we report how often humans disagree with the stored labels (3.3% in the
+samples), and (c) we never let an LLM write labels.
+
+**"Why keep law and science if they are so hard?"**
+Removing them would make the benchmark easier than the real world. We keep them and report results
+per subject, so any weakness is visible instead of hidden.
+
+**"Why did κ go up from 0.717 to 0.865?"**
+After the pilot we turned every disagreement into a written rule (rules 11–15). Clearer rules,
+fewer disagreements.
+
+**"Why are `unsure` items excluded from κ?"**
+`unsure` means *the item itself is broken* (e.g. the passage does not answer the question), not
+"I am not confident". An item nobody can label honestly is not a disagreement between people.
+
+**"Why do you keep 'wrong' labels that humans dispute?"**
+Because changing the target from a spreadsheet would silently change the exam. Disputes are listed
+(222, of which 116 unanimous) and reported as a finding; any fix happens at the source followed by
+a rebuild and a fresh audit.
+
+**"What does the metadata probe prove?"**
+That answer length, digits and punctuation cannot predict correctness (0.534, close to a coin
+flip). A model that scores well must be using the content.
+
+**"Why no RAG?"**
+With retrieval, a model could look up the fact instead of judging the answer. We would be measuring
+the search step, and the closed-book condition would stop being closed-book.
+
+---
+
+## 18. What comes next
+
+In the order they will happen:
+
+1. **Finish step 10:** adjudicate 253 rows → run the merge → rerun the audit.
+2. **Step 11 — the model ladder** (milestones M4–M5), each model on 3 seeds, scored on dev:
+   - **N-gram** (word + character pieces) with Logistic Regression and SVM — the simplest baseline.
+   - **Skip-gram / word2vec** word embeddings with Logistic Regression and XGBoost.
+   - **BiRNN, BiLSTM, BiLSTM + attention** — neural networks that read text in order.
+   - **Pretrained transformers:** BanglaBERT, MuRIL, XLM-R, mBERT, IndicBERT v2.
+   - **Further pretraining** of mBERT / XLM-R on unlabeled Bengali text.
+   - **Ensemble** of the best three, and an LLM zero-shot reference point.
+   - Classical models are *expected* to land around 0.50–0.65. That is a correct result, not a bug.
+3. **Step 12 — final evaluation** on `test.jsonl`, **once**, reported by condition, easy/hard,
+   subject and hallucination type, with statistical tests (McNemar, bootstrap confidence intervals)
+   before claiming any model beats another.
+
+When each of these finishes, add its section here in the same What / Why / How / Result / Checked
+format.

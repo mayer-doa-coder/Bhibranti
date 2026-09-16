@@ -22,7 +22,8 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 
 ## Current status
 
-**M0 done. M1 done. M2 done (kappa = 0.717). Next up: M3 — annotate the corpus.**
+**M0 done. M1 done. M2 done (kappa = 0.717). M3: annotation done (test kappa = 0.865), merge tool
+ready — adjudicate, then merge.**
 
 - [x] Repo scaffolded, `configs/schema.json` frozen, seeds fixed at **42, 1337, 2024**
 - [x] 62,084 raw records → cleaned to 56,480 in `data/interim/bn_pool.jsonl`
@@ -33,14 +34,28 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 - [x] **M2 PASSED — Cohen's κ = 0.717** on 100 blind items, 2 annotators
       → [`data/annotated/agreement_test_v1/IAA_REPORT.md`](data/annotated/agreement_test_v1/IAA_REPORT.md)
 - [x] Guidelines extended with Rules 11–15, taken from the actual disagreements
-- [x] M3 sheets built → `data/annotated/round1/`. dev + train arrive **90% pre-filled**;
-      **test is blind** because `your_type` reveals the binary label (D4)
-- [ ] **M3: annotate them.** Every record still has `hallucination_type='unlabeled'`
+- [x] M3 sheets built → `data/annotated/round1/`
+- [x] **All four annotation sets complete and validated**: test/tawhid (1,356), test/shejan
+      (1,356), dev (1,346), train_spotcheck (1,252) — 5,310 rows, 0 structural errors, 0 tampered
+      question/answer text, 0 cross-split leakage. Files use a `*_FINAL.csv` naming convention.
+- [x] **Test split double-annotated — Cohen's κ = 0.865** (full 1,356 items, not a sample)
+      → run `python src/score_test_agreement.py --a-dir .../test/tawhid --b-dir .../test/shejan`
+- [x] **Merge tool rebuilt** — `src/merge_annotation.py` now reads the `*_FINAL.csv` sheets.
+      Dry run verified; write path tested on a copy (labels/difficulty untouched, idempotent,
+      gate still 0.534). It never changes `label` or `difficulty`.
+- [ ] **Adjudicate 253 rows** in `data/annotated/round1/adjudication.csv` (test 191: types differ,
+      correct-vs-wrong split, unsure; dev 25; train 37), then **run the merge for real**.
+      Humans settled 1,724 of 4,480 wrong-answer types automatically (38.5%).
+- [ ] **Train coverage decision:** 2,503 train wrong answers were never in the 20% sample. Label
+      noise in the sample is 3.3% (< the 5% rule in guide §5.3), so labels are sound; their *types*
+      stay `unlabeled` unless annotated or filled with `--with-llm` (marked `llm_consensus`).
+- [x] **Label disputes recorded, not applied:** 222 records where a human disagrees with the
+      corpus label (116 unanimous) → `data/annotated/round1/label_disputes.csv`.
 - [ ] Model ladder not built yet
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
-knowledge — law, science, BCS and literature are all included on equal footing (965 pairs,
-21.5% of the corpus). Difficulty is *measured* (see `difficulty`), not filtered away.
+knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
+21.6% of the corpus). Difficulty is *measured* (see `difficulty`), not filtered away.
 
 **`geography` is gone**, and that is not a difficulty judgement: every geography item was
 fill-in-the-blank, and this project is QA only.
@@ -80,6 +95,10 @@ python src/audit.py --data data/splits --probe metadata
 # M3 — build the annotation sheets, then check filled ones
 python src/build_annotation_sheets.py        # refuses to clobber labelled work
 python src/validate_annotation.py --dir data/annotated/round1/test/tawhid
+python src/score_test_agreement.py --a-dir data/annotated/round1/test/tawhid \
+  --b-dir data/annotated/round1/test/shejan --a-name Tawhid --b-name Shejan   # kappa 0.865
+python src/merge_annotation.py --dry-run     # sheets -> corpus report; drop --dry-run to write
+                                             # rerun it after ANY build_corpus.py rebuild
 
 # M2 gate — PASSED at kappa 0.717. Rerun any time:
 python src/score_agreement.py \n  --a data/annotated/agreement_test_v1/items_for_annotation_tawhid.csv \n  --b data/annotated/agreement_test_v1/items_for_annotation_shejan.csv
@@ -108,6 +127,9 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/score_agreement.py` | ✅ Cohen's kappa — the M2 gate |
 | `src/build_annotation_sheets.py` | ✅ Builds the M3 sheets. Read its docstring — 6 documented guards |
 | `src/validate_annotation.py` | ✅ Checks filled sheets for the mistakes that actually happen |
+| `src/score_test_agreement.py` | ✅ Cohen's kappa on the full test split |
+| `src/merge_annotation.py` | ✅ Human sheets → `hallucination_type` in corpus + splits. Never touches `label` |
+| [docs/PROJECT_WALKTHROUGH.md](docs/PROJECT_WALKTHROUGH.md) | Beginner-friendly explanation of every step so far — **keep it updated as steps finish** |
 | `src/audit.py` | ✅ Shortcut probes + structural checks |
 | `src/preprocess.py` | ⬜ Input formats F1/F2/F3 |
 | `src/train_classical.py` | ⬜ N-gram, Skip-gram/word2vec, BiRNN, BiLSTM(+attn) |

@@ -122,7 +122,7 @@ is now the **hard subset**, where the same string matcher gets 0.456. See §5.5.
 ### 5.1 Data requirements
 
 **Every subject is included, and nothing is excluded for being hard.** Law, science, BCS and
-literature are all in the corpus on the same footing as every other subject — 965 pairs, 21.5%
+literature are all in the corpus on the same footing as every other subject — 966 pairs, 21.6%
 of the total. Difficulty is measured, never filtered.
 
 **One exception, and it is about task type rather than difficulty: fill-in-the-blank items are
@@ -163,12 +163,12 @@ one subject is a finding about the corpus, not annotator failure.
 | D1 | ≥ 4,000 QA pairs | Must | ✅ 4,480 |
 | D2 | 60/40 has-context / no-context | Must | ✅ 2,688 / 1,792 |
 | D3 | 50/50 class balance (`0` hallucinated / `1` correct) | Must | ✅ exact |
-| D4 | Test split 100% human-verified, double-annotated | Must | ⬜ sheets built, **blind** |
+| D4 | Test split 100% human-verified, double-annotated | Must | ✅ annotated (κ 0.865); ⬜ not yet merged into `corpus.jsonl` |
 | D4a | dev/train may be pre-filled and verified; **test may not** — `hallucination_type` is `none` iff the answer is correct, so pre-filling it would reveal the label | Must | ✅ enforced in `build_annotation_sheets.py` |
-| D5 | Cohen's κ ≥ 0.60 on the binary label | Must | ✅ 0.717 |
+| D5 | Cohen's κ ≥ 0.60 on the binary label | Must | ✅ 0.717 (M2, 100-item pilot) and ✅ 0.865 (full 1,356-item test split) |
 | D6 | No subject excluded for difficulty; QA-only (no cloze) | Must | ✅ 13 subjects |
 | D7 | Pairs never split across train/dev/test | Must | ✅ verified |
-| D8 | Hallucination type labelled for every `label == 0` item | Must | ⬜ all `unlabeled` |
+| D8 | Hallucination type labelled for every `label == 0` item | Must | ⬜ merge tool ready (`src/merge_annotation.py`, dry-run verified). Settled by humans: test 487/678, dev 648/673, train 589/3,129 = 1,724/4,480 (38.5%). 253 await adjudication; 2,503 train records were never in the 20% sample. Corpus still shows `unlabeled` until the merge is run |
 | D9 | Easy/hard difficulty labelled | Must | ✅ by construction (§5.5) |
 | D10 | Licence recorded for every source before ingestion | Must | ⚠ 2 open questions |
 | D11 | `script_condition` and `cmi` populated (Phase 2 payload — never evaluated on) | Should | ✅ |
@@ -263,7 +263,7 @@ call it correct"* scores:
 |---|---:|---:|
 | All has-context | 5,376 | **0.812** |
 | Easy subset | 3,522 | 0.980 |
-| **Hard subset** | 1,600 | **0.456** |
+| **Hard subset** | 1,854 | **0.456** |
 
 This is a property of the source data: correct answers in extractive QA tend to be verbatim spans
 of the passage, and the generated wrong answers usually are not. `difficulty` encodes it —
@@ -334,9 +334,9 @@ trained rather than prompted — so do not claim a head-to-head win.
 | ID | Milestone | Gate to pass | Status |
 |---|---|---|---|
 | M0 | Foundations: repo, schema, seeds, source pool ingested and audited | Audit written | ✅ |
-| M1 | Corpus built and filtered for answerability | **V1 metadata probe < 0.60** | ✅ 0.534 |
+| M1 | Corpus built, filtered for validity (QA only), split by pair | **V1 metadata probe < 0.60** | ✅ 0.534 |
 | M2 | Annotation protocol proven | **Cohen's κ ≥ 0.60** on 100 blind items | ✅ **0.717** |
-| M3 | Full corpus annotated, splits locked | D4, D8 met | ⬜ **current** |
+| M3 | Full corpus annotated, splits locked | D4, D8 met | ⬜ annotation done (κ 0.865), merge tool built — **current:** adjudicate 253 rows, then run the merge |
 | M4 | Model ladder trained (M1–M7) | All families logged | ⬜ |
 | M5 | Sweeps, further pretraining, ensemble | V3, V4 enforced | ⬜ |
 | M6 | Final evaluation on `test.jsonl` — **once** | Targets in §6.1 | ⬜ |

@@ -1,0 +1,591 @@
+% =====================================================================
+%  Project Proposal
+%  BangHallu: A Bengali Corpus for Hallucination Detection in LLMs
+%
+%  Compile with:  pdflatex proposal.tex   (run twice for the ToC)
+%
+%  This file is deliberately pure ASCII. pdflatex with inputenc utf8 cannot
+%  typeset Bengali script -- it stops with "Unicode character not set up
+%  for use with LaTeX" -- so the single Bengali title in the reference list
+%  is given in romanised form. To use real Bengali script, compile with
+%  XeLaTeX or LuaLaTeX and load a Bengali-capable font, for example:
+%      \usepackage{fontspec}
+%      \newfontfamily\bengali{Noto Serif Bengali}[Script=Bengali]
+%  Every package used below ships with a standard TeX Live install.
+% =====================================================================
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+
+\onehalfspacing
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Hallucination Detection for Bengali QA}
+\fancyhead[R]{\small KUET}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\begin{document}
+
+% =====================================================================
+%  TITLE PAGE
+% =====================================================================
+\begin{titlepage}
+\centering
+\vspace*{1.2cm}
+
+{\LARGE\bfseries BangHallu: A Bengali Corpus for Hallucination Detection in Large Language Models\par}
+
+\vspace{1.6cm}
+{\large\bfseries Project Proposal\par}
+
+\vspace{2.0cm}
+
+{\large\bfseries Submitted by\par}
+\vspace{0.4cm}
+{\large
+Tawhidul Hasan\\
+2107004\\[0.35cm]
+Md. Saif Ahmed Shejan\\
+2107009\par}
+
+\vspace{1.6cm}
+
+{\large\bfseries Submitted to\par}
+\vspace{0.4cm}
+{\large
+Dr. K. M. Azharul Hasan\\
+Professor\\[0.35cm]
+Md. Nazirulhasan Shawon\\
+Assistant Professor\par}
+
+\vspace{2.0cm}
+
+{\large Department of Computer Science and Engineering\par}
+{\large\bfseries Khulna University of Engineering \& Technology\par}
+
+\vfill
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Abstract}
+% =====================================================================
+
+Large language models now answer questions in Bengali fluently. They are also
+sometimes simply wrong, and they are wrong in a confident voice.
+
+We propose to build a detector that reads a question, an optional supporting
+passage, and a candidate answer, and decides whether that answer is
+correct or hallucinated. It will not try to produce the right
+answer, only to judge the answer it is shown.
+
+The project delivers two things: a Bengali question-answering corpus of reasonable pairs where each pair being one question with one correct and one
+hallucinated answer, and a benchmark of models climbing from simple
+word-counting methods through embeddings and recurrent networks to pretrained
+encoders such as BanglaBERT. This proposal is the outcome of a preparatory study of the Bengali and
+multilingual hallucination literature, of candidate data sources, and of several
+possible designs.
+
+% =====================================================================
+\section{Problem Statement}
+% =====================================================================
+
+\subsection{The practical problem}
+
+Bengali is spoken by roughly 230 million people and is the sixth most widely
+spoken language in the world, yet it remains low-resource for evaluation: there
+are far fewer test sets, benchmarks and trained models for Bengali than for
+English. Students across Bangladesh increasingly use language models as study
+aids for competitive and school examinations. The danger is specific. When a model does not know an answer, it rarely says so.
+It produces something that reads like an answer, but the fact inside it is
+invented.
+
+\subsection{Why this is hard to detect}
+
+Our preparatory study identified several difficulties the design must address.
+
+\begin{enumerate}[leftmargin=*,itemsep=3pt]
+  \item Wrong answers look like right ones. A hallucinated answer
+  reuses the correct vocabulary and grammar, often differing by a single year,
+  name, or character. Surface similarity offers little signal.
+
+  \item Two different judgements are needed. With a passage, the
+  question is ``does this passage support this answer?'', that is reading
+  comprehension. Without one, it becomes ``is this true?'', that is factual recall.
+
+  \item Datasets can contain shortcuts. If correct answers are copied
+  word-for-word from the passage while wrong answers are not, a model can score
+  highly by matching strings and learn nothing about meaning.
+
+\end{enumerate}
+
+\subsection{The gap this project fills}
+
+BenHalluEval (2026) is the first dedicated Bengali hallucination benchmark, but
+it evaluates how well existing models detect hallucination by prompting
+them. To our knowledge no published work trains a dedicated detector for
+Bengali and compares model families on a like-for-like basis. That is the gap: a
+trained Bengali detector, benchmarked across a full ladder of methods, on a
+corpus whose validity is explicitly audited rather than assumed.
+
+% =====================================================================
+\section{Objectives}
+% =====================================================================
+
+\subsection{Primary objectives}
+
+\begin{enumerate}[label=O\arabic*.,leftmargin=*,itemsep=3pt]
+  \item Build a validated Bengali hallucination corpus of QA
+  pairs, covering both grounded  and closed-book conditions, labelled by native Bengali speakers.
+
+  \item Establish a reliable annotation protocol, demonstrated by two annotators
+  independently labelling a blind sample and reaching Cohen's $\kappa \geq 0.60$
+  before full annotation begins.
+
+  \item Benchmark a complete model ladder, from lexical n-gram models through
+  embeddings and recurrent networks to pretrained transformer encoders.
+
+  \item Reach macro-F1 $\geq 0.80$ on the has-context hard subset, the
+  pairs a string matcher cannot solve and $\geq 0.60$ on no-context.
+  
+\end{enumerate}
+
+\subsection{Secondary objectives}
+
+Establish Bengali baselines against which a second phase, covering romanised Bengali (Banglish), can later be measured.
+
+
+% =====================================================================
+\section{Literature Review}
+% =====================================================================
+
+\subsection{Hallucination, taxonomy, and shortcut learning}
+
+Hallucination is conventionally split in two. Intrinsic hallucination
+contradicts a source document supplied to the model; extrinsic
+hallucination cannot be checked against any supplied source and is a claim about
+the world. This maps directly onto our two conditions, which is why our taxonomy
+has one branch for each: \texttt{entity}, \texttt{numeric}, \texttt{relational}
+and \texttt{contradiction} for grounded items; \texttt{fabricated} and
+\texttt{overclaim} for closed-book ones.
+
+A recurring failure in dataset construction, characterised by Geirhos et al.
+(2020), is that a model learns a surface regularity instead of the intended
+task. In our setting the obvious candidate is string overlap between answer and
+passage. The standard remedy is a probe: train a deliberately impoverished
+classifier and check that it fails.
+
+\subsection{Bengali resources}
+
+BenHalluEval (arXiv:2605.31483, 2026) is the first benchmark built for
+Bengali hallucination: four tasks, 12{,}000 hallucinated candidates generated
+across twelve error types, nine models evaluated under a dual-track protocol.
+Three of its findings shape our design. Dual-track evaluation is
+necessary, measuring only detection rate hides a model that calls everything
+hallucinated, so we report per-class metrics separately. Native-speaker
+validation reached $\kappa = 0.911$--$0.926$, which puts our $\kappa \geq 0.60$
+requirement in perspective as a floor, not a target. Code-mixed input
+behaves differently from native script, which is why romanised Bengali is a
+separate phase rather than a variant.
+
+Several encoders cover Bengali and form the upper rungs of our ladder.
+BanglaBERT is an ELECTRA discriminator pretrained on
+Bengali and our primary candidate.
+
+\subsection{Methodological templates}
+
+BanTH (arXiv:2410.13281) is our closest model: binary classification
+over transliterated Bengali, with a published further-pretraining recipe and
+annotation guidelines whose structure we intend to imitate. Its most useful
+lesson is sobering, across seven very different encoders macro-F1 spanned only
+77.35 to 74.51, a range of 2.8 points, and further-pretraining gains were around
+two points, slightly negative for XLM-R. Architecture choice alone will not
+transform a result; input format and further pretraining matter more.
+
+ViHallu (arXiv:2601.04711), a Vietnamese shared task with 111 teams,
+reached 84.80 macro-F1 at best against an encoder-only baseline of 32.83.
+MedHallu contributes two ideas we adopt: stratifying a corpus by
+difficulty, and letting annotators say ``not sure'' instead of guessing.
+
+% =====================================================================
+\section{Dataset and Data Collection}
+% =====================================================================
+
+\subsection{Sources and construction}
+
+Two source families have been identified: Bengali Wikipedia,
+supplying passage text for grounded items, and BCS-style question
+banks, supplying chiefly the closed-book items. Each question will be paired with two answers: one correct and one hallucinated.
+The hallucinated answer will be produced from the same source text with
+language-model assistance, under prompt constraints on length and register so
+the two are not separable by superficial features. Every stage will be a
+deterministic script at a fixed seed, so the corpus rebuilds byte-for-byte.
+
+
+Subjects will span reading comprehension, history, grammar, mathematics, idiom,
+antonym, synonym, vocabulary, law, science, BCS general knowledge and
+literature. A per-subject cap is needed because mathematics alone dominates the
+closed-book pool. No subject will be excluded for being difficult.
+
+Splits are grouped by pair so both answers to a question land together.
+Splitting by record would put the correct answer in training and the wrong one
+in test, letting a model score by recognising the question rather than judging
+the answer. The test split will be examined exactly once, at the end; every
+intermediate decision is made on development data.
+
+\subsection{Annotation protocol}
+
+Two native speakers will annotate independently, following guidelines written
+before annotation begins. For each item they record the binary label, the
+error type when the answer is wrong, a difficulty judgement, and a note.
+
+Two rules govern outside knowledge. For no-context items an annotator
+may verify a fact and should note that they did. For has-context items they must
+not: the question is whether this passage supports the answer, and an
+external source cannot settle that. Where an item cannot be labelled honestly,
+the passage does not address the question, the answer type does not match, or
+the text is broken, the annotator writes \texttt{unsure} rather than guessing.
+Such items are excluded from the agreement score and reported by subject, since
+a cluster in one subject is a finding about the corpus, not a failure by the
+annotator.
+
+Agreement is a gate. A blind sample of 100 items will be labelled by
+both annotators and scored with Cohen's $\kappa$. If $\kappa < 0.60$ we treat the
+guidelines as the problem rather than the annotators, write an explicit rule for
+each disagreement, and repeat on the same items. Only then does full annotation
+begin. Effort is then allocated by importance: the test split labelled in full
+by both with disagreements adjudicated, development by one annotator, and
+training through a 20\% sample sufficient to estimate label noise.
+
+% =====================================================================
+\section{Methodology}
+\label{sec:methodology}
+% =====================================================================
+
+\subsection{Task formulation and input}
+
+Given a question $q$, an optional passage $c$, and a candidate answer $a$, we
+learn $f(q, c, a) \rightarrow \{0, 1\}$, where $1$ means correct and
+$0$ means hallucinated. Text will be normalised with the \texttt{csebuetnlp} normaliser before
+BanglaBERT, which was pretrained on normalised text. Three input formats will be
+compared, since format frequently matters more than architecture: F1
+(question + answer, the only option without a passage), F2 (context +
+question + answer).
+
+Truncation needs care. At a fixed maximum length a long passage is cut,
+and if the cut removes the supporting sentence the label is no longer derivable
+from the input and the model trains on noise. We will truncate the
+context only, never the question or the answer.
+
+\subsection{The model ladder}
+
+Models are built in ascending order of capacity, so each rung is an
+interpretable floor for the next.
+
+\begin{center}
+\begin{tabular}{L{2.4cm} L{5.4cm} L{5.4cm}}
+\toprule
+\textbf{Rung} & \textbf{Models} & \textbf{Purpose} \\
+\midrule
+Lexical & $n$-gram + LogReg / SVM; TF-IDF over word 1--2 and character 3--5
+grams & Lower bound. Character features should matter given Bengali inflection \\
+\addlinespace
+Embedding & Skip-gram / word2vec + LogReg; + XGBoost &
+Is distributional meaning alone enough? \\
+\addlinespace
+Recurrent & BiRNN; BiLSTM; BiLSTM + attention &
+Do word order and selective attention help? \\
+\addlinespace
+Pretrained & BanglaBERT, MuRIL, XLM-R, mBERT, IndicBERT v2 &
+The real contenders \\
+\addlinespace
+Adapted & Further pretraining on unlabelled Bengali (mBERT, XLM-R only) &
+Domain adaptation; BanglaBERT is ELECTRA and cannot use masked-LM \\
+\addlinespace
+Ensemble & Soft-voting over the strongest three encoders &
+Typically worth one to three points \\
+\addlinespace
+Reference & Zero-shot / few-shot LLM on 300--500 items &
+A ceiling marker, not a competitor \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Classical models are expected to reach roughly 0.50-0.65 macro-F1 at this
+corpus size. That will be the correct outcome, not a failure; they have
+no pretraining to draw on, and their limits are what motivate the upper rungs.
+
+Hyperparameters start from BanTH's published setup: learning rate
+$2 \times 10^{-5}$, AdamW, max length 256, batch 32, 5 epochs with early
+stopping, warmup 0.1, weight decay 0.01, fp16. Every configuration runs with
+three seeds (42, 1337, 2024), reported as mean $\pm$ standard deviation, with
+five-fold cross-validation over train and dev while test stays untouched.
+
+
+% =====================================================================
+\section{Evaluation Metrics}
+% =====================================================================
+
+\subsection{Metric and breakdowns}
+
+The primary metric is macro-F1, the unweighted mean of both classes' F1
+scores, chosen because it weights correct and hallucinated equally so a model
+cannot score well by favouring the majority class. For a class $c$:
+\[
+F1_c = \frac{2 P_c R_c}{P_c + R_c},
+\qquad
+\text{macro-F1} = \tfrac{1}{2}\left(F1_{\text{correct}} + F1_{\text{halluc.}}\right).
+\]
+We also report accuracy, per-class precision and recall, AUROC, and the
+confusion matrix.
+
+A single averaged number conceals exactly the differences that matter, so every
+result is decomposed four ways: has-context vs no-context (two
+different tasks); easy vs hard (without it a string matcher looks
+competitive); by subject (law, science and BCS need outside knowledge a
+closed-book model lacks, and a collapse there is a finding, not a defect); and
+by hallucination type, once annotation is complete.
+
+\subsection{Targets and gates}
+
+\begin{center}
+\begin{tabular}{L{6.2cm} c L{4.4cm}}
+\toprule
+\textbf{Metric} & \textbf{Target} & \textbf{Role} \\
+\midrule
+Macro-F1, has-context hard subset & $\geq 0.80$ & headline result \\
+Macro-F1, has-context overall & report only & shown beside the string baseline \\
+Macro-F1, no-context & $\geq 0.60$ & second headline \\
+Metadata shortcut probe & $< 0.60$ & blocking gate \\
+Cohen's $\kappa$ & $\geq 0.60$ & gate before full annotation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Expected Outcomes}
+% =====================================================================
+
+\subsection{Deliverables}
+
+An annotated Bengali hallucination corpus of at least 4{,}000 pairs with locked,
+reproducible splits; a written annotation guideline document revised against
+real disagreements; an inter-annotator agreement report; a source and licence
+register; trained model checkpoints across the ladder; five results tables (main
+results, difficulty breakdown, per-type F1, format ablation, shortcut audit); a
+complete experiment log including failures; a validity audit report; a
+reproducible codebase; and a technical report.
+
+\subsection{Expected performance}
+
+Calibrated from comparable published work rather than chosen optimistically.
+
+\begin{center}
+\begin{tabular}{L{5.2cm} c L{4.8cm}}
+\toprule
+\textbf{Setting} & \textbf{Realistic macro-F1} & \textbf{Trigger for audit} \\
+\midrule
+Has-context (grounded) & 0.80 -- 0.90 & $> 0.95$ \\
+No-context (closed book) & 0.60 -- 0.75 & $> 0.85$ \\
+Hard subset only & 0.55 -- 0.70 & --- \\
+Classical models & 0.50 -- 0.65 & expected, not a failure \\
+Zero-shot LLM reference & 0.60 -- 0.72 & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Findings we anticipate}
+
+\begin{itemize}[leftmargin=*,itemsep=3pt]
+  \item No-context will score well below has-context. Closed-book
+  verification without retrieval is genuinely hard. That is a correct result and
+  we will report it plainly.
+  \item The easy-hard gap will be large. It may be the single most
+  informative number the project produces, since it separates models that read
+  from models that pattern-match.
+  \item Model spread will be narrow. BanTH found 2.8 points across
+  seven encoders; we will report ties honestly rather than manufacture a ranking.
+  \item Models may collapse on law, science and BCS. Reported per
+  subject, that is a finding about the limits of the approach.
+\end{itemize}
+
+% =====================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =====================================================================
+
+\subsection{Conclusions reached during exploration}
+
+Four decisions were not obvious at the outset, and each rules out an approach
+that might otherwise seem natural.
+
+1. Bengali script before romanised Bengali. Romanised Bengali was our original
+starting point, but it is a harder problem layered on an unsolved one, with no
+Bengali baseline to measure degradation against. Our exploration of automatic
+transliteration also showed that rule-based character mapping produces text a
+native speaker struggles to read, which would make reliable annotation
+impossible. It becomes a second phase.
+
+2. Measure difficulty rather than filter it. We considered excluding law and
+science, reasoning that an annotator who must look a fact up cannot label
+reliably. We concluded against it: removing difficult material makes a benchmark
+easier without making it better, and conceals a limitation instead of measuring
+it. A difficulty field and a per-subject breakdown replace exclusion.
+
+3. Question answering only. A cloze item trains a model to copy a missing span
+rather than judge whether an answer is supported, and is trivially solved by
+string matching. This concerns task type, not difficulty.
+
+4. No retrieval at inference. Retrieval would let a system look the fact up,
+measuring the retriever rather than the detector, and would empty the
+closed-book condition of meaning.
+
+\subsection{Why the shortcut audit matters most}
+
+The most likely way for this project to fail is not a low score but a high one
+that means nothing. If correct answers turn out to be verbatim spans of their
+passages while hallucinated ones are not, a rule containing no learning could
+score highly, and a model reporting a similar figure would look like a success
+while representing almost no improvement. The whole evaluation design is
+arranged around detecting that: the metadata probe is a blocking gate, and the
+hard subset rather than the overall figure is the headline target. The same
+reasoning explains why pairs whose incorrect answer is also a verbatim span are
+kept rather than discarded; those are the ones a model cannot cheat on.
+
+\subsection{Anticipated limitations}
+
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+  \item At roughly 4{,}000 pairs the corpus is modest, a realistic constraint of
+  a low-resource language.
+  \item Hallucinated answers will be produced with language-model assistance, so
+  a model could learn the generator's fingerprint instead of the concept. The
+  answer-only probe is our defence.
+  \item The system says an answer is wrong; it does not say which words are
+  wrong, nor produce a correction.
+  \item Agreement between two annotators is less robust than across three.
+\end{itemize}
+
+\subsection{Risks and mitigations}
+
+\begin{center}
+\begin{tabular}{L{5.0cm} L{8.6cm}}
+\toprule
+\textbf{Risk} & \textbf{Mitigation} \\
+\midrule
+A shortcut inflates scores & Metadata probe as a blocking gate, run on the pilot
+and on every rebuild \\
+Agreement falls below 0.60 & Fix the guidelines, not the annotators; rerun the
+same items \\
+Question-bank licence forbids redistribution & Settle provenance before
+ingestion; keep those items separable \\
+Model differences too small to distinguish & Three seeds, McNemar's test,
+bootstrap CIs; report ties \\
+No-context performance is poor & Expected; report as a finding, not a defect \\
+Test set contaminated by repeated use & All decisions on dev; test evaluated once \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Conclusion}
+% =====================================================================
+
+A language model answering a Bengali examination question can be confidently
+wrong, and the student least able to detect the error is exactly the student who
+asked. We propose to build a detector that judges whether a given answer is
+correct or hallucinated, together with the corpus needed to train and evaluate
+it fairly.
+
+The plan follows from a preparatory study rather than assumption: we chose
+Bengali script over romanised Bengali, chose to measure difficulty rather than
+filter it out, ruled out fill-in-the-blank items as a different task, and ruled
+out retrieval as something that would measure the wrong thing. Two commitments
+follow from that. We will measure what a rule with no learning in it can score
+on our own data before trusting any model, and report the hard subset as the
+headline result. And subjects that are hard to verify will stay in the corpus
+and be measured, because a benchmark made easier is not a benchmark made better.
+
+If the work succeeds, the outcome will be the first trained Bengali
+hallucination detector with a published model ladder and an audited corpus.
+
+% =====================================================================
+\section*{References}
+\addcontentsline{toc}{section}{References}
+% =====================================================================
+
+\begin{enumerate}[leftmargin=*,itemsep=3pt,label={[\arabic*]}]
+
+\item BenHalluEval: A Multi-Task Hallucination Evaluation Framework for Large
+Language Models on Bengali. arXiv:2605.31483, 2026.
+
+\item BanTH: A Multi-label Hate Speech Detection Dataset for Transliterated
+Bangla. arXiv:2410.13281, 2024.
+
+\item DSC2025 ViHallu: Vietnamese Hallucination Detection Shared Task.
+arXiv:2601.04711, 2026.
+
+\item Bhattacharjee, A., Hasan, T., Ahmad, W. U., and Shahriyar, R. BanglaBERT:
+Language Model Pretraining and Benchmarks for Low-Resource Language
+Understanding Evaluation in Bangla. arXiv:2101.00204, 2021.
+
+\item Khanuja, S. et al. MuRIL: Multilingual Representations for Indian
+Languages. arXiv:2103.10730, 2021.
+
+\item Conneau, A. et al. Unsupervised Cross-lingual Representation Learning at
+Scale (XLM-R). ACL, 2020.
+
+\item Devlin, J., Chang, M.-W., Lee, K., and Toutanova, K. BERT: Pre-training of
+Deep Bidirectional Transformers for Language Understanding. NAACL, 2019.
+
+\item Clark, K., Luong, M.-T., Le, Q. V., and Manning, C. D. ELECTRA:
+Pre-training Text Encoders as Discriminators Rather Than Generators. ICLR, 2020.
+
+\item Doddapaneni, S. et al. IndicBERT v2: Towards Leaving No Indic Language
+Behind. ACL, 2023.
+
+\item MedHallu: A Comprehensive Benchmark for Detecting Medical Hallucinations
+in Large Language Models. \texttt{medhallu.github.io}, 2025.
+
+\item Mikolov, T., Chen, K., Corrado, G., and Dean, J. Efficient Estimation of
+Word Representations in Vector Space. ICLR Workshop, 2013.
+
+\item Hochreiter, S., and Schmidhuber, J. Long Short-Term Memory. Neural
+Computation, 9(8), 1997.
+
+\item Cohen, J. A Coefficient of Agreement for Nominal Scales. Educational and
+Psychological Measurement, 20(1), 1960.
+
+\item McNemar, Q. Note on the Sampling Error of the Difference Between
+Correlated Proportions or Percentages. Psychometrika, 12(2), 1947.
+
+\item Geirhos, R. et al. Shortcut Learning in Deep Neural Networks. Nature
+Machine Intelligence, 2020.
+
+\end{enumerate}
+
+\end{document}

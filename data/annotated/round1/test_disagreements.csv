@@ -1,0 +1,87 @@
+﻿item_id,condition,subject,difficulty,corpus_label,Tawhid_label,Shejan_label,question,answer
+test_0028,has_context,history,hard,correct,wrong,correct,আলাওলের পৃষ্ঠপোষকদের মধ্যে কে সৈন্যমন্ত্রী ছিলেন?,মুহাম্মদ খান
+test_0046,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদের আলোকে “সব বিভাগ আবার সাতটি অঞ্চলে” বিষয়ে প্রাসঙ্গিক তথ্যটি কী?,সব বিভাগ আবার সাতটি অঞ্চলে বিভক্ত নয়।
+test_0089,has_context,reading_comprehension,easy,wrong,correct,wrong,প্রদত্ত তথ্য অনুযায়ী “প্রতিটি প্রদেশের নামই সেই প্রদেশের” সম্পর্কে কী জানা যায়?,প্রতিটি প্রদেশের নামই সেই প্রদেশের রাজধানীর নাম নয়।
+test_0099,has_context,reading_comprehension,easy,wrong,wrong,correct,রবীন্দ্র সেতুর নকশা কে তৈরি করেন ?,বানিয়েছিলেন লেসলি
+test_0104,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ থেকে “তিনি শ্রীনগর জেলার সোনাওয়ার বিধানসভা” সম্পর্কিত সঠিক তথ্যটি লিখুন।,তিনি শ্রীনগর জেলার সোনাওয়ার বিধানসভা কেন্দ্রের বিধায়ক ছিলেন না।
+test_0125,has_context,grammar,hard,wrong,correct,wrong,'নর' ও 'ইন্দ্র' শব্দ দুটির সন্ধিতে কোন শব্দ গঠিত হয়?,নরইন্দ্র
+test_0126,has_context,others,hard,correct,wrong,correct,তামিম ইকবালের ওয়ানডে অভিষেক কোন দলের বিপক্ষে?,জিম্বাবুয়ের বিপক্ষে।
+test_0128,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশে “তিনি টেলিভিশন চ্যানেল মালিকদের এসটিসিও” কীভাবে বর্ণিত হয়েছে?,তিনি টেলিভিশন চ্যানেল মালিকদের (এসটিসিও) সমিতির প্রতিষ্ঠাতা সভাপতি নয়।
+test_0132,has_context,reading_comprehension,easy,wrong,correct,wrong,"অনুচ্ছেদ অনুযায়ী, “কাগজের প্রচলন চীন সারাবিশ্বে ছড়িয়ে” প্রসঙ্গে কী তথ্য দেওয়া হয়েছে?",কাগজের প্রচলন চীন থেকে সারাবিশ্বে ছড়িয়ে পরে মুসলিম বিশ্বের মাধ্যমে এবং ত্রয়োদশ শতাব্দীতে মধ্যযুগের ইউরোপে কাগজের উৎপাদন শুরু হয় না।
+test_0158,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদের ভিত্তিতে “ব্যক্তিগত জীবনে নিজামী সামসুন্নাহার সাথে” বিষয়ে কোন বক্তব্যটি সঠিক?,ব্যক্তিগত জীবনে নিজামী সামসুন্নাহার সাথে বিবাহ বন্ধনে আবদ্ধ হন নয়।
+test_0189,has_context,reading_comprehension,hard,correct,wrong,correct,বারবারা আসকিন্স কবে জন্মগ্রহণ করেন?,আসকিন্স (জন্ম ১৯৩৯) একজন আমেরিকান রসায়নবিদ।
+test_0201,has_context,others,hard,correct,wrong,correct,শরৎচন্দ্র চট্টোপাধ্যায় কলিকাতা বিশ্ববিদ্যালয় থেকে জগত্তারিণী স্বর্ণপদক কত সালে পান?,১৯২৩ সালে।
+test_0233,has_context,others,hard,correct,wrong,correct,পদ্মা সেতুতে মোট কতটি পিয়ার রয়েছে?,৪২টি।
+test_0236,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশে “স্বাভাবিক অবস্তায় যোনীপথেই মানব সন্তান” কীভাবে বর্ণিত হয়েছে?,স্বাভাবিক অবস্তায় যোনীপথেই মানব সন্তান ভূমিষ্ঠ হয় না।
+test_0243,has_context,history,hard,correct,wrong,correct,জগদীশচন্দ্র বসুর 'Nervous Mechanism of Plants' গ্রন্থটি কত সালে প্রকাশিত হয়?,১৯২৫ সালে
+test_0252,no_context,law,easy,wrong,correct,wrong,"স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৫৬-এর বিষয় কী?",বাজেট
+test_0253,has_context,reading_comprehension,easy,wrong,correct,wrong,চূর্ণী গাঙ্গুলির স্বামীর নাম কী ?,সুমন গাঙ্গুলিকে
+test_0263,no_context,grammar,easy,correct,wrong,correct,কোনটি মধ্যাবস্থিত পশ্চাৎ স্বরধ্বনি?,ও
+test_0264,has_context,others,hard,correct,wrong,correct,প্রথম কোন ভাষায় কুরআনের অনুবাদ হয় ?,ফারসি ভাষায়।
+test_0272,no_context,synonym,easy,correct,wrong,correct,“গোষ্ঠী” শব্দের সমার্থক শব্দ কোনটি?,প্রবর
+test_0288,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ অনুসারে “শেষে ভীম কৃষ্ণের ইঙ্গিতে অন্যায়ভাবে” সম্পর্কিত উত্তর দিন।,শেষে ভীম কৃষ্ণের ইঙ্গিতে অন্যায়ভাবে গদা দ্বারা দুর্যোধনের ঊরুভঙ্গ করে তাঁকে বধ করেন না।
+test_0289,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ থেকে “সার্বভৌমত্ব কোনো পরিচালনা পর্ষদের বাইরের” সম্পর্কিত সঠিক তথ্যটি লিখুন।,সার্বভৌমত্ব কোনো পরিচালনা পর্ষদের বাইরের কোনো উৎস বা সংগঠনের হস্তক্ষেপ ছাড়া কাজ করার পূর্ণ অধিকার ও ক্ষমতা নয়।
+test_0312,no_context,science,easy,correct,wrong,correct,মাইক্রোসফট তাদের দ্বিতীয় খুচরা বিপনী বিতান কোথায় খোলে?,সিডনির পিট স্ট্রিট মল
+test_0324,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদের আলোকে “তিনি এদেশের চলচ্চিত্র অঙ্গনের অত্যন্ত” বিষয়ে প্রাসঙ্গিক তথ্যটি কী?,তিনি এদেশের চলচ্চিত্র অঙ্গনের অত্যন্ত সফল এবং সকলের শ্রদ্ধাভাজন ব্যক্তি ছিলেন না।
+test_0346,no_context,grammar,hard,correct,correct,wrong,"এখন থেকেই তোমার পড়া উচিত, তবেই পরীক্ষায় প্রথম হতে পারবে।  এটা কোন বাক্যের উদাহরণ?",জটিল বাক্য
+test_0362,has_context,others,hard,wrong,correct,wrong,ধারাটির সাধারণ অনুপাত কত?,২।
+test_0387,no_context,science,easy,wrong,correct,wrong,বাংলাদেশে প্রায় কত প্রজাতির গেছো ব্যাঙ দেখা যায়?,১৪টি প্রজাতি
+test_0388,has_context,reading_comprehension,easy,wrong,correct,wrong,হ্যারি পটার সিরিজের দ্বিতীয় চলচ্চিত্রটির নাম কী ?,হ্যারি পটার অ্যান্ড দ্য চেম্বার অফ সিক্রেটস নয়।
+test_0437,no_context,bcs,easy,wrong,correct,wrong,ঐতিহাসিক 'ছয়-দফা' বঙ্গবন্ধু শেখ মুজিবুর রহমান আনুষ্ঠানিকভাবে ঘোষণা করেন—,৫ ফেব্রুয়ারি ১৯৬৬
+test_0451,has_context,history,hard,correct,wrong,correct,৮ নম্বর সেক্টরের লালবাজার উপ-সেক্টরের কমান্ডার কে ছিলেন?,ক্যাপ্টেন এ আর আজম চৌধুরী
+test_0475,has_context,others,hard,wrong,correct,wrong,নিচের কোনটি মৌলিক সংখ্যা নয়?,২৬৩ মৌলিক সংখ্যা নয়।
+test_0476,has_context,reading_comprehension,hard,correct,wrong,correct,সুই সাম্রাজ্যের প্রতিষ্ঠাতা কে ছিলেন ?,সুই সম্রাট ওয়েন (ইয়াং জিয়ান)।
+test_0480,has_context,history,hard,correct,wrong,correct,সত্যেন্দ্রনাথ বসুকে বিশ্বভারতী বিশ্ববিদ্যালয় কর্তৃপক্ষ কোন উপাধিতে ভূষিত করে?,দেশিকোত্তম
+test_0496,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'চৌরাস্তা' শব্দটি কোন সমাসের উদাহরণ?",দ্বিগু
+test_0525,has_context,reading_comprehension,easy,wrong,correct,wrong,প্রদত্ত তথ্য অনুযায়ী “দেবিকা রাণী নোবেল পুরস্কার বিজয়ী” সম্পর্কে কী জানা যায়?,দেবিকা রাণী নোবেল পুরস্কার বিজয়ী রবীন্দ্রনাথ ঠাকুরের আত্মীয় ছিলেন না।
+test_0543,has_context,reading_comprehension,easy,correct,correct,wrong,বর্তমানে টুথব্রাশ বা দাঁতের ব্রাশ কি দিয়ে তৈরি করা হয় ?,টুথব্রাশ বা দাঁতের ব্রাশ হচ্ছে মুখে ব্যবহৃত এক ধরণের উপকরণ।
+test_0548,has_context,history,hard,wrong,correct,wrong,নিচের কোনটি আহসান মঞ্জিল জাদুঘরের প্রকৃত গ্যালারির নাম নয়? ক) মুসলিম লীগ কক্ষ খ) বিলিয়ার্ড কক্ষ গ) সিন্দুক কক্ষ ঘ) দরবার সংগ্রহশালা,ক) মুসলিম লীগ কক্ষ
+test_0565,has_context,history,hard,correct,wrong,correct,৫ নম্বর সেক্টরের সদরদপ্তর কোথায় ছিল?,বাঁশতলা
+test_0574,no_context,antonym,easy,correct,wrong,correct,'কালো' শব্দের শুদ্ধ বিপরীত শব্দ কোনটি?,আলো
+test_0602,no_context,history,easy,correct,wrong,correct,বঙ্গবন্ধুর ১৯৭১ সালের ৭ মার্চ ভাষণের সময়কালে পূর্ব পাকিস্তানে যে আন্দোলন চলছিল সেটি হলো :,ইসলামাবাদের সামরিক সরকার পদত্যাগের আন্দোলন
+test_0613,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'উপশহর' শব্দটি কোন সমাসের উদাহরণ?",অব্যয়ীভাব
+test_0647,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'অনুধাবন' শব্দটি কোন সমাসের উদাহরণ?",অব্যয়ীভাব
+test_0659,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'উপজেলা' শব্দটি কোন সমাসের উদাহরণ?",অব্যয়ীভাব
+test_0667,has_context,reading_comprehension,hard,wrong,correct,wrong,রামায়ণ অনুসারে মন্দোদরীর মায়ের নাম কী ?,ময়াসুর
+test_0704,has_context,history,hard,wrong,correct,wrong,আলাওলের পৃষ্ঠপোষকদের মধ্যে কে সৈন্যমন্ত্রী ছিলেন?,মজলিস নবরাজ
+test_0706,has_context,others,hard,wrong,correct,wrong,তামিম ইকবালের ওয়ানডে অভিষেক কোন দলের বিপক্ষে?,নিউজিল্যান্ডের বিপক্ষে।
+test_0730,has_context,reading_comprehension,easy,wrong,correct,wrong,প্রদত্ত অনুচ্ছেদে “তার বাবার আবু কুহাফা মায়ের” সম্পর্কে মূল বক্তব্যটি কী?,তার বাবার নাম আবু কুহাফা ও মায়ের নাম সালমা বিনতে সাখার নয়।
+test_0731,has_context,history,hard,wrong,correct,wrong,৫ নম্বর সেক্টরের সদরদপ্তর কোথায় ছিল?,ডাউকি
+test_0735,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ অনুসারে “এশিয়ার দেশগুলোর অর্থনৈতিক উন্নয়নকে আরো” সম্পর্কিত উত্তর দিন।,"এশিয়ার দেশগুলোর অর্থনৈতিক উন্নয়নকে আরো দ্রুত, বেগবান ও সহজ করাই ব্যাংকটির মূল উদ্দেশ্য নয়।"
+test_0762,has_context,reading_comprehension,hard,wrong,correct,wrong,বারবারা আসকিন্স কবে জন্মগ্রহণ করেন?,১৯৭৮
+test_0782,has_context,reading_comprehension,easy,wrong,correct,wrong,"অনুচ্ছেদ অনুযায়ী, “ভারতের ঝাড়খণ্ড ছত্রিশগড় রাজ্যের ছোটনাগপুর” প্রসঙ্গে কী তথ্য দেওয়া হয়েছে?","ভারতের ঝাড়খণ্ড ও ছত্রিশগড় রাজ্যের ছোটনাগপুর অঞ্চল, মধ্যপ্রদেশ, ওড়িশা এবং পশ্চিমবঙ্গে এঁদের বাস নয়।"
+test_0788,has_context,others,hard,correct,wrong,correct,নিচের কোনটি মৌলিক সংখ্যা নয়?,প্রদত্ত বিকল্প ছাড়া নির্দিষ্ট অমৌলিক সংখ্যা বলা যায় না; ২৬৩ নিজেই একটি মৌলিক সংখ্যা।
+test_0811,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদের ভিত্তিতে “শব্দ দুটি হল ফিলোস বন্ধু” বিষয়ে কোন বক্তব্যটি সঠিক?,"শব্দ দুটি হল: φίλος (ফিলোস: বন্ধু, ভালোবাসার পাত্র) এবং σοφία (সোফিয়া: প্রজ্ঞা) নয়।"
+test_0817,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'শোকার্ত' শব্দটি কোন সমাসের উদাহরণ?",তৃতীয়া তৎপুরুষ
+test_0842,has_context,others,hard,correct,wrong,correct,"আকৃতি, অবস্থান ও কাজের প্রকৃতিভেদে আবরণী টিস্যু কত ধরনের?",৩ ধরনের।
+test_0858,has_context,others,hard,wrong,correct,wrong,পদ্মা সেতুতে মোট কতটি পিয়ার রয়েছে?,৪১টি।
+test_0869,has_context,reading_comprehension,easy,correct,correct,wrong,অজ্ঞাতনামা চলচ্চিত্রটির সংগীত পরিচালক কে ছিলেন ?,তৌকির আহমেদ
+test_0892,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশে “সামরিক বাহিনীতে যোগ্য কর্মকর্তা তৈরীতে” কীভাবে বর্ণিত হয়েছে?,সামরিক বাহিনীতে যোগ্য কর্মকর্তা তৈরীতে অল্প বয়স থেকেই প্রশিক্ষণ শুরু করানোটা বিশেষ গুরুত্ব বহন করতে পারে নয়।
+test_0894,has_context,law,easy,wrong,correct,wrong,"প্রদত্ত প্রসঙ্গ অনুযায়ী স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ১৮ সম্পর্কে কী বলা হয়েছে?",সরকার প্রশাসককে কর্মসম্পাদনে সহায়তা করিবার জন্য প্রয়োজনীয় সংখ্যক সদস্য সমন্বয়ে কমিটি গঠন করিতে পারিবে না।
+test_0914,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ অনুসারে “যেখানে পানি চালিত কাগজ উৎপাদনের” সম্পর্কিত উত্তর দিন।,যেখানে সর্বপ্রথম পানি-চালিত কাগজ উৎপাদনের কাগজকল ও কলকব্জা বা মেশিন আবিষ্কার ও নির্মাণ করা হয় না।
+test_0953,has_context,reading_comprehension,hard,wrong,correct,wrong,সুই সাম্রাজ্যের প্রতিষ্ঠাতা কে ছিলেন ?,ইয়াং সম্রাট ওয়েন
+test_0968,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'শয়নকক্ষ' শব্দটি কোন সমাসের উদাহরণ?",চতুর্থী তৎপুরুষ
+test_0972,no_context,law,easy,correct,wrong,correct,"স্থানীয় সরকার (ইউনিয়ন পরিষদ) আইন, ২০০৯-এর ধারা ৫৬-এর বিষয় কী?",দায়যুক্ত ব্যয়
+test_0974,has_context,reading_comprehension,hard,wrong,wrong,correct,পাঠ্যাংশ থেকে “৭৩ আলচি সহ নিম্ন লাদাখ” সম্পর্কিত সঠিক তথ্যটি লিখুন।,:৭৪ এই সময় আলচি সহ নিম্ন লাদাখ মধ্য তিব্বতের 'ব্রো নামক পরিবারগোষ্ঠীর শাসনাধীন ছিল।
+test_0995,has_context,history,hard,wrong,correct,wrong,সত্যেন্দ্রনাথ বসুকে বিশ্বভারতী বিশ্ববিদ্যালয় কর্তৃপক্ষ কোন উপাধিতে ভূষিত করে?,পদ্মভূষণ
+test_1031,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'প্রীতিভোজ' শব্দটি কোন সমাসের উদাহরণ?",মধ্যপদলোপী কর্মধারয়
+test_1034,no_context,science,easy,correct,wrong,correct,বাংলাদেশে প্রায় কত প্রজাতির গেছো ব্যাঙ দেখা যায়?,প্রায় ৭ প্রজাতি
+test_1053,no_context,bcs,easy,correct,wrong,correct,ঐতিহাসিক 'ছয়-দফা' বঙ্গবন্ধু শেখ মুজিবুর রহমান আনুষ্ঠানিকভাবে ঘোষণা করেন—,২৩ মার্চ ১৯৬৬
+test_1074,has_context,others,hard,wrong,correct,wrong,শরৎচন্দ্র চট্টোপাধ্যায় কলিকাতা বিশ্ববিদ্যালয় থেকে জগত্তারিণী স্বর্ণপদক কত সালে পান?,১৯৩৬ সালে।
+test_1102,no_context,grammar,hard,wrong,wrong,correct,"এখন থেকেই তোমার পড়া উচিত, তবেই পরীক্ষায় প্রথম হতে পারবে।  এটা কোন বাক্যের উদাহরণ?",যৌগিক বাক্য
+test_1119,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশে “তাই সময়কে সাম্রজ্যের সোনালি যুগ” কীভাবে বর্ণিত হয়েছে?,তাই এই সময়কে এই সাম্রজ্যের সোনালি যুগ বলে গণ্য করা হয় না।
+test_1122,has_context,grammar,hard,correct,wrong,correct,'গো' ও 'অক্ষ' শব্দ দুটির সন্ধিতে কোন শব্দ গঠিত হয়?,গবাক্ষ
+test_1123,has_context,history,hard,wrong,correct,wrong,৮ নম্বর সেক্টরের লালবাজার উপ-সেক্টরের কমান্ডার কে ছিলেন?,ক্যাপ্টেন মোস্তাফিজুর রহমান
+test_1134,has_context,grammar,hard,correct,wrong,correct,"ব্যাসবাক্য অনুযায়ী, 'তেমাথা' শব্দটি কোন সমাসের উদাহরণ?",দ্বিগু
+test_1180,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদের আলোকে “তিনি বাংলাদেশ আওয়ামী লীগ কেন্দ্রীয়” বিষয়ে প্রাসঙ্গিক তথ্যটি কী?,তিনি বাংলাদেশ আওয়ামী লীগ এর কেন্দ্রীয় কমিটির সাবেক প্রেসিডিয়াম সদস্য এবং বাংলাদেশ আওয়ামী লীগ এর মুখপত্র মাসিক 'উত্তরণ' এর সম্পাদক ও প্রকাশক নয়।
+test_1182,no_context,grammar,easy,wrong,correct,wrong,কোনটি মধ্যাবস্থিত পশ্চাৎ স্বরধ্বনি?,অ
+test_1190,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ থেকে “তাঁর পিতার আক্কাস আলী মন্ডল” সম্পর্কিত সঠিক তথ্যটি লিখুন।,তাঁর পিতার নাম আক্কাস আলী মন্ডল এবং মায়ের নাম মোসাম্মাৎ কায়মুন্নেসা নয়।
+test_1212,has_context,others,hard,correct,wrong,correct,লোহা কি চৌম্বক পদার্থ?,হ্যাঁ।
+test_1218,has_context,history,hard,correct,wrong,correct,নিচের কোনটি আহসান মঞ্জিল জাদুঘরের প্রকৃত গ্যালারির নাম নয়? ক) মুসলিম লীগ কক্ষ খ) বিলিয়ার্ড কক্ষ গ) সিন্দুক কক্ষ ঘ) দরবার সংগ্রহশালা,ঘ) দরবার সংগ্রহশালা
+test_1239,has_context,reading_comprehension,easy,wrong,correct,wrong,প্রদত্ত অনুচ্ছেদে “যথা ফান্ডাস জরায়ু কর্পাস সারভিক্স” সম্পর্কে মূল বক্তব্যটি কী?,"যথা: ফান্ডাস (জরায়ু), কর্পাস, সারভিক্স, এবং অন্তঃস্থ অরফিস নয়।"
+test_1254,has_context,others,hard,wrong,correct,wrong,প্রথম কোন ভাষায় কুরআনের অনুবাদ হয় ?,বাংলা ভাষায়।
+test_1272,has_context,others,hard,wrong,correct,wrong,ভালো-মন্দ কোন ধরনের মূল্যবোধ?,অর্থনৈতিক মূল্যবোধ।
+test_1295,has_context,grammar,hard,correct,wrong,correct,'নর' ও 'ইন্দ্র' শব্দ দুটির সন্ধিতে কোন শব্দ গঠিত হয়?,নরেন্দ্র
+test_1304,has_context,reading_comprehension,hard,correct,wrong,correct,রামায়ণ অনুসারে মন্দোদরীর মায়ের নাম কী ?,অপ্সরা হেমা।
+test_1307,has_context,reading_comprehension,easy,wrong,correct,wrong,অনুচ্ছেদে “হরপ্রসাদ শাস্ত্রী ব্রিটিশ বাংলা প্রদেশের” প্রসঙ্গে কোন তথ্য উল্লেখ আছে?,হরপ্রসাদ শাস্ত্রী ব্রিটিশ বাংলা প্রদেশের খুলনা জেলার কুমিরা গ্রামে জন্মগ্রহণ করেননি।
+test_1355,has_context,reading_comprehension,easy,wrong,correct,wrong,পাঠ্যাংশ থেকে “পিটক শব্দটি পালি অর্থ ঝুড়ি” সম্পর্কিত সঠিক তথ্যটি লিখুন।,"পিটক শব্দটি পালি এর অর্থ - ঝুড়ি, পাত্র, বাক্স ইত্যাদি, অর্থ যেখানে কোনো কিছু সংরক্ষন করা হয় না।"

@@ -5,7 +5,7 @@ Reads the raw vendor files in ``data/raw/bn_qa_pool/`` and produces:
   * ``data/interim/bn_pool.jsonl``            — full cleaned pool, schema-mapped
   * ``data/splits/_pool_sanity/*.jsonl``  — throwaway grouped splits used only to
     sanity-check this script. The REAL Phase 1 splits are built by
-    ``src/build_corpus.py``, which filters the pool down to answerable items.
+    ``src/build_corpus.py``, which pairs, filters and splits the pool.
 
 SOURCES — the content comes from Bengali Wikipedia (CC BY-SA 4.0) and BCS question
 banks; the QA pairs were built from those texts with LLM assistance. Full register

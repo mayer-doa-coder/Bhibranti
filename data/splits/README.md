@@ -5,11 +5,17 @@ Deterministic, seed 42.
 
 | Split | pairs | records |
 |---|---:|---:|
-| `train.jsonl` | 3,129 | 8,044 |
-| `dev.jsonl` | 673 | 1,732 |
-| `test.jsonl` | 678 | 1,740 |
+| `train.jsonl` | 3,129 | 6,258 |
+| `dev.jsonl` | 673 | 1,346 |
+| `test.jsonl` | 678 | 1,356 |
 
-Each split is 60% has-context and 50/50 correct vs hallucinated.
+70 / 15 / 15 by pair, split separately inside every (condition, subject) group, so each split is
+60% has-context and 50/50 correct vs hallucinated, with the same subject mix.
+
+**Annotation lives in these files after M3.** `src/merge_annotation.py` writes
+`hallucination_type`, `type_source`, `annotator_1/2` and `adjudicated` into them from
+`data/annotated/round1/`. Rebuilding with `src/build_corpus.py` resets those fields, so rerun the
+merge after any rebuild.
 
 ## Two rules
 

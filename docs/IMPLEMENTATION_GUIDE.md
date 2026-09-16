@@ -160,17 +160,19 @@ Read the docstring of `src/build_corpus.py` before changing anything about the d
 data/raw/bn_qa_pool/              14 source .jsonl, verbatim, 62,084 records
   |  src/build_bn_pool.py         clean, dedup, map to the frozen schema
 data/interim/bn_pool.jsonl        56,480 records (the unfiltered pool)
-  |  src/build_corpus.py          answerability filter + pairing + splits
+  |  src/build_corpus.py          pairing + validity filters + splits
 data/corpus/bn_v1/corpus.jsonl    4,480 pairs / 8,960 records
-data/splits/{train,dev,test}      3,129 / 599 / 678 pairs
+data/splits/{train,dev,test}      3,129 / 673 / 678 pairs
+  |  src/merge_annotation.py      human annotation (data/annotated/round1/) -> types
 ```
 
-Both scripts are deterministic at seed 42 and reproduce byte-identical output.
+Both build scripts are deterministic at seed 42 and reproduce byte-identical output. A rebuild
+resets `hallucination_type` to `unlabeled`, so rerun `src/merge_annotation.py` after one.
 
 ### 3.1 Scope: every subject is included
 
 **Nothing is excluded for being hard.** Law, science, BCS and literature are all in the corpus —
-965 pairs, 21.5% of the total — on the same footing as everything else.
+966 pairs, 21.6% of the total — on the same footing as everything else.
 
 **This project is QA only, so fill-in-the-blank items are excluded.** That is a task-type rule,
 not a difficulty rule: a cloze item trains span-copying rather than answer checking, and a string
@@ -203,7 +205,7 @@ Only four things are removed, and none of them is about difficulty:
 
 Plus two composition constraints from the PRD, which shape the sample rather than filter for
 quality: 60/40 has-context to no-context (D2), and a per-subject cap so no subject dominates a
-condition — mathematics alone supplies 76% of the no-context pool and would otherwise swamp it.
+condition — mathematics alone supplies 59% of the no-context pool and would otherwise swamp it.
 
 **There are no fill-in-the-blank items.** `build_corpus.py` asserts this at the end of every
 build, so the corpus cannot silently regain them.
@@ -230,7 +232,7 @@ two answers, so the model has to actually read the passage.
 |---|---:|---:|
 | All has-context | 5,376 | 0.812 |
 | Easy | 3,522 | 0.980 |
-| **Hard** | 1,600 | **0.456** |
+| **Hard** | 1,854 | **0.456** |
 
 **Never report a has-context score without these numbers next to it.** A model at 0.83 overall
 has beaten a string matcher by one point. The hard subset is where the real result lives.
@@ -292,11 +294,16 @@ If κ is low, the usual cause is that "hallucination" is under-defined for edge 
 
 | Data | Annotation level |
 |---|---|
-| Test set (500) | **100% human, double-annotated, adjudicated** |
-| Dev set (500) | 100% human, single annotator + spot check |
-| Train set (3,000) | Generator label + human verification on a 20% sample |
+| Test set (678 pairs / 1,356 records) | **100% human, double-annotated, adjudicated** |
+| Dev set (673 pairs / 1,346 records) | 100% human, single annotator + spot check |
+| Train set (3,129 pairs / 6,258 records) | Generator label + human verification on a 20% sample (626 pairs / 1,252 records) |
 
 If the 20% sample shows > 5% label noise, verify more.
+
+**Measured at M3:** the train spot-check annotator disagreed with the corpus label on 40 of the
+1,203 rows they could decide (**3.3%**), and dev shows the same rate (43 / 1,314). That is under
+the 5% threshold, so by this rule train does not need wider label verification. The disputed rows
+are listed in `data/annotated/round1/label_disputes.csv`; labels are never changed by the merge.
 
 ---
 
@@ -334,8 +341,8 @@ F3 frames the task as textual entailment -- "does this passage entail this answe
 close to what pretrained NLI models already do. Starting from an XLM-R checkpoint already
 fine-tuned on XNLI is worth trying.
 
-**Truncation matters more than usual here.** Passages have a median length of 295 characters but
-run up to 3,132. At `max_length=256` a long passage gets cut, and if the supporting sentence is
+**Truncation matters more than usual here.** Passages in the corpus have a median length of 266 characters
+but run up to 3,132. At `max_length=256` a long passage gets cut, and if the supporting sentence is
 what got cut, the label is no longer derivable from the input -- you are training on noise.
 Truncate the **context**, never the question or the answer.
 

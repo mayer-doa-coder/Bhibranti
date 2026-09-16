@@ -28,6 +28,7 @@
       "enum": ["none", "entity", "numeric", "relational", "contradiction", "fabricated", "overclaim", "unlabeled"],
       "description": "Intrinsic (has_context): entity, numeric, relational, contradiction. Extrinsic (no_context): fabricated, overclaim. Faithful class (label == 1): none. 'unlabeled' is PROVISIONAL for un-annotated interim data only and must never appear in a released split (PRD D8)."
     },
+    "type_source":        { "enum": ["definitional", "double_annotated", "single_annotated", "adjudicated", "adjudicator_skip", "adjudicator_dispute", "awaiting_adjudication", "not_annotated", "llm_consensus"], "description": "Added at M3 by src/merge_annotation.py: where hallucination_type came from. 'definitional' = label 1, so 'none' by definition. Lets every report say how much of the type labelling is human work. Reveals the label - never a model input." },
     "difficulty":         { "enum": ["easy", "hard", "unlabeled"] },
     "generator_model":    { "type": "string" },
     "generation_seed":    { "type": ["integer", "null"] },

@@ -25,21 +25,26 @@ kaggle.json
 Thumbs.db
 
 # ---------------------------------------------------------------------------
-# DATA POLICY — read before changing
+# DATA POLICY - read before changing
 #
-# Everything under data/ is currently TRACKED on purpose, and it is small
-# enough to stay that way (~120 MB total, largest single file 73 MB).
+# Everything under data/ is TRACKED on purpose. It is ~120 MB, the largest
+# single file is 73 MB, and every byte of it is either a source the corpus is
+# built from or the corpus itself. Losing it loses the project.
 #
-# It is tracked because data/SOURCES.md still has two OPEN licence questions:
+# The repository is PRIVATE (made private 2026-08-24), which is what makes
+# that safe. Two licence questions in data/SOURCES.md are still open:
 #   1. whether the BCS questions came from a redistributable source
-#   2. what licence the released corpus carries (Wikipedia CC BY-SA 4.0
-#      share-alike likely propagates to it)
+#   2. what licence the released corpus carries (Wikipedia is CC BY-SA 4.0,
+#      and share-alike likely propagates to anything derived from it)
 #
-# Until BOTH are answered, do not push this repository to a public remote.
-# A private remote is fine. See data/SOURCES.md "Open actions".
+# ==> BEFORE MAKING THIS REPOSITORY PUBLIC, close both questions, fix the
+#     LICENSE file (it currently says MIT, which almost certainly cannot be
+#     granted over CC BY-SA-derived content), and add the Wikipedia
+#     attribution file that CC BY-SA requires. See SOURCES.md "Open actions".
 #
-# If the answer turns out to be "not redistributable", uncomment the lines
-# below to untrack the source pool, and keep only the scripts that rebuild it:
+# If question 1 comes back "not redistributable", uncomment the two lines
+# below to untrack the source pool. The scripts rebuild it from scratch, so
+# nothing is lost except the convenience of having it in the repo.
 # ---------------------------------------------------------------------------
 # data/raw/bn_qa_pool/*.jsonl
 # data/interim/*.jsonl
@@ -61,6 +66,7 @@ data/annotated/**/items_*.csv
 !data/annotated/round1/**
 
 # Scratch
+*.bak
 /tmp/
 scratch/
 *.tmp

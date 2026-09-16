@@ -10,3 +10,4 @@ corpus_004,2026-08-23,context_substring_rule_easy,rule_based,none,42,,,,corpus/b
 corpus_005,2026-08-23,context_substring_rule_hard,rule_based,none,42,,,,corpus/bn_v1,,0.456,"same rule, HARD subset - shortcut useless. THIS is the meaningful target"
 corpus_006,2026-08-23,majority_class,none,none,42,,,,corpus/bn_v1,,0.333,"sanity baseline"
 iaa_001,2026-08-24,cohens_kappa_2annotators,binary_label,none,42,,,,agreement_test_v1,,0.717,"M2 GATE PASSED (>=0.60). 92/100 items scored; 8 unlabelable excluded; raw agreement 85.9%"
+iaa_002,2026-09-17,cohens_kappa_2annotators,binary_label,none,42,,,,round1_test_full,,0.865,"D5 on the FULL test split (Tawhid vs Shejan, blind). 1270/1356 scored; 86 unsure/unreadable excluded; raw agreement 93.2%; 86 disagreements"

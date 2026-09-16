@@ -2,10 +2,10 @@
 
 SCOPE OF THE CORPUS
 -------------------
-**Every subject in the source pool is included.** Law, science, BCS, literature,
-geography -- including the fill-in-the-blank items -- are all in, on the same
-footing as every other subject. Nothing is excluded for being hard to answer or
-for needing outside knowledge.
+**Every subject is included on equal footing.** Law, science, BCS and literature
+are all in. Nothing is excluded for being hard to answer or for needing outside
+knowledge. The only subject missing is `geography`, and not for difficulty: every
+geography item was fill-in-the-blank, and this project is QA only (filter 2).
 
 An earlier version of this file filtered on "answerability" and dropped roughly
 4,150 pairs across those subjects. That filter has been removed by decision of
@@ -33,7 +33,7 @@ item rather than about validity. None is about how hard an item is:
 
 Composition constraints (PRD D2/D3) still apply: 60/40 has-context to
 no-context, 50/50 labels, and a per-subject cap so no single subject dominates a
-condition -- mathematics alone supplies 76% of the no-context pool and would
+condition -- mathematics alone supplies 59% of the no-context pool and would
 otherwise swamp it.
 
 Run from the repository root:
@@ -61,9 +61,9 @@ SEED = 42
 NO_CONTEXT_RATIO = 40 / 60      # PRD D2: 60% has-context / 40% no-context
 # No single subject may dominate a condition. The limit differs by condition
 # because the two look very different after filtering:
-#   no-context has 6 subjects and mathematics alone supplies 76%, so a strict
-#     30% cap is needed -- and is easily met.
-#   has-context has only 4, and the two largest (reading_comprehension and
+#   no-context has 11 subjects and mathematics alone supplies 59% of the
+#     filtered pool, so a strict 30% cap is needed -- and is easily met.
+#   has-context has only 5, and the two largest (reading_comprehension and
 #     history) are the SAME task -- an answer grounded in a Wikipedia passage --
 #     differing only in topic. Forcing them to 30% would discard a quarter of
 #     the scarcest data in the project to fix an imbalance that does not
@@ -198,8 +198,8 @@ def assign_difficulty(pair: list[dict]) -> None:
       supports the answer. EASY when the shortcut does separate them.
 
       This is the split worth reporting separately. The substring baseline
-      scores about 0.855 across all has-context pairs but only about chance on
-      the hard ones, so a has-context score means little without both numbers.
+      scores 0.812 across all has-context records, 0.980 on easy and 0.456 on
+      hard, so a has-context score means little without both numbers.
 
     no-context -- there is no passage, so the substring rule cannot apply at
       all. HARD here means the wrong answer is a near-miss: close in surface

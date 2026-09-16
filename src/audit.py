@@ -193,11 +193,12 @@ def structural_checks(rows: list[dict]) -> list[str]:
             "(not human-annotated; PRD D8 unmet)"
         )
 
-    banglish = sum(1 for r in rows if r.get("script_condition") == "banglish")
-    if banglish == 0:
+    # Phase 1 is Bengali script only (PRD section 7.1); Banglish is Phase 2.
+    not_bengali = sum(1 for r in rows if r.get("script_condition") != "bengali_script")
+    if not_bengali:
         problems.append(
-            "no records have script_condition='banglish' — this is not yet the "
-            "Bangla-English code-mixed corpus the project requires (PRD section 7.1)"
+            f"{not_bengali:,} records are not script_condition='bengali_script' — "
+            "Phase 1 is Bengali only (PRD section 7.1)"
         )
 
     annotated = sum(1 for r in rows if r.get("annotator_1") is not None)
