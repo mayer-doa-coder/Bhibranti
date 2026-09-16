@@ -26,9 +26,11 @@
     "label":              { "enum": [0, 1], "description": "PROJECT-WIDE CONVENTION (PRD 5.1a): 1 = CORRECT / FAITHFUL, 0 = INCORRECT / HALLUCINATED. An is-it-correct? flag. This matches the bn_qa_pool source files natively, so no flip is applied anywhere in the pipeline. Note the positive class (1) is faithful, not hallucinated - the reverse of much of the literature." },
     "hallucination_type": {
       "enum": ["none", "entity", "numeric", "relational", "contradiction", "fabricated", "overclaim", "unlabeled"],
-      "description": "Intrinsic (has_context): entity, numeric, relational, contradiction. Extrinsic (no_context): fabricated, overclaim. Faithful class (label == 1): none. 'unlabeled' is PROVISIONAL for un-annotated interim data only and must never appear in a released split (PRD D8)."
+      "description": "Intrinsic (has_context): entity, numeric, relational, contradiction. Extrinsic (no_context): fabricated, overclaim. Faithful class (label == 1): none. 'unlabeled' is allowed in a released split only where D8 does not require a type: train records outside the 20% spot-check (type_source 'outside_train_sample') and items the adjudicator marked skip/dispute. Anywhere else it means annotation is unfinished (PRD D8, 5.1c)."
     },
-    "type_source":        { "enum": ["definitional", "double_annotated", "single_annotated", "adjudicated", "adjudicator_skip", "adjudicator_dispute", "awaiting_adjudication", "not_annotated", "llm_consensus"], "description": "Added at M3 by src/merge_annotation.py: where hallucination_type came from. 'definitional' = label 1, so 'none' by definition. Lets every report say how much of the type labelling is human work. Reveals the label - never a model input." },
+    "type_source":        { "enum": ["definitional", "double_annotated", "single_annotated", "adjudicated", "adjudicator_skip", "adjudicator_dispute", "awaiting_adjudication", "outside_train_sample", "llm_consensus"], "description": "Added at M3 by src/merge_annotation.py: where hallucination_type came from. 'definitional' = label 1, so 'none' by definition. 'outside_train_sample' = a train record not in the 20% human spot-check; its type is out of D8 scope by design (PRD 5.1c). Lets every report say how much of the type labelling is human work. Reveals the label - never a model input." },
+    "excluded":           { "type": "boolean", "description": "Added at M3 (PRD Q5 / 5.1d). True on both records of a pair human review found unusable: stored label confirmed wrong, or broken item. Excluded pairs are left out of training AND scoring; load data through src/splits.py, which filters them." },
+    "exclusion_reason":   { "type": "string", "description": "'+'-joined subset of: wrong_answer_confirmed_correct, broken_item, correct_answer_judged_wrong. Empty when excluded is false." },
     "difficulty":         { "enum": ["easy", "hard", "unlabeled"] },
     "generator_model":    { "type": "string" },
     "generation_seed":    { "type": ["integer", "null"] },
@@ -49,6 +51,6 @@
     "condition == 'no_context'  ->  hallucination_type in ['none','fabricated','overclaim','unlabeled']",
     "condition == 'has_context' ->  hallucination_type in ['none','entity','numeric','relational','contradiction','unlabeled']",
     "no pair_id may appear in more than one split",
-    "released splits must contain no 'unlabeled' values"
+    "released splits: hallucination_type == 'unlabeled'  ->  type_source in ['outside_train_sample','adjudicator_skip','adjudicator_dispute']  (PRD D8 as narrowed in 5.1c)"
   ]
 }

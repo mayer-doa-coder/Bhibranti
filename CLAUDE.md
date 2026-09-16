@@ -22,8 +22,11 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 
 ## Current status
 
-**M0 done. M1 done. M2 done (kappa = 0.717). M3: annotation done (test kappa = 0.865), merge tool
-ready — adjudicate, then merge.**
+**M0 done. M1 done. M2 done (kappa = 0.717). M3 done (test kappa = 0.865, merged, D8 met,
+180 flagged pairs excluded). Next up: M4 — the model ladder.**
+
+**Usable data (load it only through `src/splits.py`):** train 3,067 pairs / 6,134 records ·
+dev 619 / 1,238 · test 614 / 1,228.
 
 - [x] Repo scaffolded, `configs/schema.json` frozen, seeds fixed at **42, 1337, 2024**
 - [x] 62,084 raw records → cleaned to 56,480 in `data/interim/bn_pool.jsonl`
@@ -43,12 +46,15 @@ ready — adjudicate, then merge.**
 - [x] **Merge tool rebuilt** — `src/merge_annotation.py` now reads the `*_FINAL.csv` sheets.
       Dry run verified; write path tested on a copy (labels/difficulty untouched, idempotent,
       gate still 0.534). It never changes `label` or `difficulty`.
-- [ ] **Adjudicate 253 rows** in `data/annotated/round1/adjudication.csv` (test 191: types differ,
-      correct-vs-wrong split, unsure; dev 25; train 37), then **run the merge for real**.
-      Humans settled 1,724 of 4,480 wrong-answer types automatically (38.5%).
-- [ ] **Train coverage decision:** 2,503 train wrong answers were never in the 20% sample. Label
-      noise in the sample is 3.3% (< the 5% rule in guide §5.3), so labels are sound; their *types*
-      stay `unlabeled` unless annotated or filled with `--with-llm` (marked `llm_consensus`).
+- [x] **Adjudication done** — all 253 rows decided (141+2 typed, 89 dispute, 21 skip; 3 typo-pairs
+      moved to skip on review). **Merge written 2026-09-17**; strict audit passes, gate 0.534.
+      D8 MET: 1,867 of 1,977 in-scope wrong answers typed, 110 excluded by the adjudicator.
+- [x] **D8 narrowed (PRD §5.1c):** types are required for test + dev + the 20% train spot-check
+      (1,977 wrong answers), not the other 2,503 train records. Those stay `unlabeled` with
+      `type_source = outside_train_sample`. Train *labels*: 4.5% confirmed noise (< 5% rule).
+- [x] **PRD Q5 decided (§5.1d): human-flagged pairs are excluded from training AND scoring** —
+      train 62, dev 54, test 64 (stored label confirmed wrong, or broken item). They stay in the
+      files marked `excluded = true`; `src/splits.py` drops them. Gate on usable data: 0.514.
 - [x] **Label disputes recorded, not applied:** 222 records where a human disagrees with the
       corpus label (116 unanimous) → `data/annotated/round1/label_disputes.csv`.
 - [ ] Model ladder not built yet
@@ -60,15 +66,18 @@ knowledge — law, science, BCS and literature are all included on equal footing
 **`geography` is gone**, and that is not a difficulty judgement: every geography item was
 fill-in-the-blank, and this project is QA only.
 
-**Three numbers your has-context score must beat.** Report them, always:
+**Three numbers your has-context score must beat.** Report them, always. Measured on the usable
+data (excluded pairs removed), because that is what models train and are scored on:
 
 | Baseline | Score | What it means |
 |---|---|---|
-| String matcher, all has-context | **0.812** | "Does the answer appear in the passage?" — no learning at all |
-| String matcher, easy subset | 0.980 | where the shortcut fully works |
-| String matcher, **hard subset** | **0.456** | on hard pairs the shortcut is useless |
+| String matcher, all has-context | **0.823** | "Does the answer appear in the passage?" — no learning at all |
+| String matcher, easy subset | 0.987 | where the shortcut fully works |
+| String matcher, **hard subset** | **0.454** | on hard pairs the shortcut is useless |
 
-A has-context macro-F1 of 0.82 is **not** a result — it barely beats a string matcher. The real
+(Before exclusion they were 0.812 / 0.980 / 0.456. For a dev or test score, recompute the baseline
+on that same split.) A has-context macro-F1 of 0.83 is **not** a result — it barely beats a string
+matcher. The real
 target is the **hard subset**, where 0.80 actually means something.
 
 ---
@@ -98,6 +107,7 @@ python src/validate_annotation.py --dir data/annotated/round1/test/tawhid
 python src/score_test_agreement.py --a-dir data/annotated/round1/test/tawhid \
   --b-dir data/annotated/round1/test/shejan --a-name Tawhid --b-name Shejan   # kappa 0.865
 python src/merge_annotation.py --dry-run     # sheets -> corpus report; drop --dry-run to write
+                                             # also sets `excluded` on human-flagged pairs
                                              # rerun it after ANY build_corpus.py rebuild
 
 # M2 gate — PASSED at kappa 0.717. Rerun any time:
@@ -128,7 +138,8 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/build_annotation_sheets.py` | ✅ Builds the M3 sheets. Read its docstring — 6 documented guards |
 | `src/validate_annotation.py` | ✅ Checks filled sheets for the mistakes that actually happen |
 | `src/score_test_agreement.py` | ✅ Cohen's kappa on the full test split |
-| `src/merge_annotation.py` | ✅ Human sheets → `hallucination_type` in corpus + splits. Never touches `label` |
+| `src/merge_annotation.py` | ✅ Human sheets → `hallucination_type` + `excluded` in corpus + splits. Never touches `label` |
+| `src/splits.py` | ✅ `load_split("train")` — **the only way to load data for training or scoring**; drops excluded pairs |
 | [docs/PROJECT_WALKTHROUGH.md](docs/PROJECT_WALKTHROUGH.md) | Beginner-friendly explanation of every step so far — **keep it updated as steps finish** |
 | `src/audit.py` | ✅ Shortcut probes + structural checks |
 | `src/preprocess.py` | ⬜ Input formats F1/F2/F3 |
@@ -163,7 +174,10 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 - Targets: has-context **≥ 0.80 on the hard subset**, no-context **≥ 0.60**, metadata probe
   **< 0.60**, κ **≥ 0.60**
 - Taxonomy: intrinsic `entity|numeric|relational|contradiction`; extrinsic `fabricated|overclaim`;
-  correct `none`
+  correct `none`. Types exist for test, dev and the train spot-check only (PRD §5.1c) — per-type
+  results are reported on **dev/test only**
+- **`hallucination_type`, `type_source`, `annotator_1/2`, `adjudicated` reveal the label — never a
+  model input**
 
 ---
 
@@ -171,7 +185,10 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 
 - **Report has-context and no-context separately**, and **easy and hard separately**. A single
   averaged number hides everything that matters here.
-- **Quote the 0.812 / 0.456 string baselines** next to every has-context score you report.
+- **Load data with `from splits import load_split`.** It drops the 180 excluded pairs (PRD §5.1d).
+  Reading `data/splits/*.jsonl` directly would train and score on labels humans confirmed wrong.
+- **Quote the string baselines** (0.823 all / 0.454 hard on usable data, or recomputed on the
+  split being scored) next to every has-context score you report.
 - **Log every run** to `results/experiment_log.csv` — including crashes and failures.
 - **Set and log a seed** in anything that touches randomness.
 - **Run `normalize()`** from `csebuetnlp/normalizer` before BanglaBERT — it was pretrained with
@@ -190,7 +207,7 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 - **DON'T touch `data/splits/test.jsonl`** except for the single sanctioned M6 evaluation.
 - **DON'T weaken the shortcut probe** to make it pass — not the threshold, not the features, not
   the split. Fix the data and rebuild.
-- **DON'T report a raw has-context number on its own.** A string matcher gets 0.812. Without the
+- **DON'T report a raw has-context number on its own.** A string matcher gets 0.823. Without the
   hard-subset number next to it, the score is meaningless.
 - **DON'T use `AutoModelForMaskedLM` on BanglaBERT** — it is an ELECTRA discriminator. Further
   pretraining targets mBERT and XLM-R only.

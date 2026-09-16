@@ -68,16 +68,30 @@ Every run writes two files here:
 | `adjudication.csv` | the 253 wrong answers whose type the humans did not settle (types differ, someone said `correct`, someone was `unsure`) | put a type, `skip`, or `dispute` in `your_decision`. Kept across reruns |
 | `label_disputes.csv` | 222 records where at least one human disagrees with the corpus label (116 where every annotator does) | nothing is applied — report it as a corpus finding |
 
-## What is NOT done yet
+**D8 scope (PRD §5.1c, decided 2026-09-17):** types are required for the 1,977 wrong answers in
+test, dev and `train_spotcheck/` — exactly what these sheets cover. The other 2,503 train wrong
+answers are out of scope by design and stay `unlabeled` with
+`type_source = outside_train_sample`. Their *labels* are sound: after adjudication the spot-check
+shows 4.5% confirmed label noise, under the 5% rule in guide §5.3.
 
-1. **Adjudication** — 253 rows in `adjudication.csv` have no decision yet.
-2. **Running the merge for real** — the dry run is verified; `corpus.jsonl` still says `unlabeled`.
-3. **Train coverage decision** — 2,503 train wrong answers were never in the 20% sample. The plan
-   (guide §5.3) says to widen *label* verification only if the sample shows > 5% label noise; it
-   shows 3.3%. Types for those rows stay `unlabeled` unless you annotate more or accept LLM-proposed
-   types (`--with-llm`, marked `llm_consensus`).
-4. **Re-running the shortcut gate** after the merge.
-5. **Observation:** `overclaim` was never chosen — every typed no-context wrong answer is
+## Status: COMPLETE (2026-09-17)
+
+- **Adjudication:** all 253 rows decided — 143 typed, 89 `dispute`, 21 `skip`. On review, three
+  typo-pairs (`test_0761`, `dev_0285`, `dev_0692`) were moved from a type to `skip` under Rule 12;
+  the original decision is kept in their notes.
+- **Merge:** written to `corpus.jsonl` and all three splits. `D8 MET` — 1,867 of 1,977 in-scope wrong
+  answers typed, 110 excluded by the adjudicator.
+- **Gate:** `python src/audit.py --data data/splits --strict` → all structural checks pass, metadata
+  probe 0.534.
+
+## Excluded pairs (PRD Q5 → §5.1d, decided 2026-09-17)
+
+Pairs whose stored label human review confirmed wrong, or whose item is broken, are **left out of
+training and scoring**: **train 62, dev 54, test 64**. The merge marks both records of each such
+pair `excluded = true` with an `exclusion_reason`; `src/splits.py` filters them. Usable data:
+train 3,067 / dev 619 / test 614 pairs.
+
+**Observation:** `overclaim` was never chosen — every typed no-context wrong answer is
    `fabricated`. Worth one sentence in the report.
 
 ## Filling a row (for reference)

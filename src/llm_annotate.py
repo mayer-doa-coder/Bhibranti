@@ -6,7 +6,8 @@ The corpus already carries a binary label (1 = correct, 0 = hallucinated) for
 all 8,960 records. Annotation therefore has two jobs, and this script treats
 them very differently:
 
-  TYPE task  -- fill `hallucination_type` on the 4,480 wrong answers (PRD D8).
+  TYPE task  -- propose `hallucination_type` for wrong answers. Optional: PRD D8
+               (narrowed, §5.1c) is met by human annotation alone.
                 This is reporting metadata. It is never trained on and never
                 predicted, so an LLM proposing it carries little risk.
                 A deterministic rule already covers 61% of them objectively

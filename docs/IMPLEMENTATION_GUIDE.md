@@ -22,12 +22,12 @@ You are done when all six hold:
 | C2 | Best model on the has-context **hard subset** | macro-F1 >= 0.80 |
 | C3 | Best model on **no-context** | macro-F1 >= 0.60 |
 | C4 | **Shortcut audit passes** | metadata probe < 0.60 macro-F1 |
-| C5 | Every has-context number reported with its string baseline | 0.812 all / 0.456 hard |
+| C5 | Every has-context number reported with its string baseline | 0.823 all / 0.454 hard (usable data) |
 | C6 | Full experiment log exists | every run recorded with seed + config |
 | C7 | **No RAG anywhere** | no retrieval at inference; see section 7.0 |
 
 **C4 is not optional.** A high score that fails C4 means the model learned an artifact, not
-hallucination detection. **C5 is the one people forget:** a string matcher scores 0.812 on
+hallucination detection. **C5 is the one people forget:** a string matcher scores 0.823 on
 has-context, so a raw 0.83 is not a result. Read section 3.3 before reporting anything.
 
 ---
@@ -219,29 +219,49 @@ shortcut-proof ones.
 ### 3.3 The two shortcuts this corpus has to fight
 
 **1. Metadata shortcut (the blocking gate).** Surface features of the answer alone -- length,
-digit ratio, punctuation -- must not predict the label. Currently **0.534**, gate is < 0.60. PASS
+digit ratio, punctuation -- must not predict the label. Currently **0.534** on all records and
+**0.514** on the usable records; the gate (< 0.60) must hold on both. PASS
 
 **2. String-matcher shortcut (report it, do not ignore it).** The rule "if the answer appears in
-the passage, call it correct" scores **0.812** across all has-context items, because correct
+the passage, call it correct" scores **0.823** across all usable has-context items, because correct
 answers in extractive QA are usually verbatim spans and generated wrong answers usually are not.
 
 `difficulty` encodes this per pair. **hard** = the string rule does *not* separate that pair's
 two answers, so the model has to actually read the passage.
 
-| Slice | records | String-matcher macro-F1 |
+| Slice | Usable records — **reference** | All records (before exclusion) |
 |---|---:|---:|
-| All has-context | 5,376 | 0.812 |
-| Easy | 3,522 | 0.980 |
-| **Hard** | 1,854 | **0.456** |
+| All has-context | **0.823** (5,092) | 0.812 (5,376) |
+| Easy | 0.987 (3,398) | 0.980 (3,522) |
+| **Hard** | **0.454** (1,694) | 0.456 (1,854) |
 
-**Never report a has-context score without these numbers next to it.** A model at 0.83 overall
+**Never report a has-context score without these numbers next to it** — and when scoring dev or
+test, recompute the string baseline on exactly the records being scored. A model at 0.83 overall
 has beaten a string matcher by one point. The hard subset is where the real result lives.
 
-### 3.4 Rebuilding
+### 3.4 Loading data for training and scoring — always through `src/splits.py`
+
+Human review flagged **180 pairs** whose stored labels cannot be trusted (confirmed wrong, or a
+broken item): train 62, dev 54, test 64. They are **excluded from training and scoring** (PRD
+§5.1d). They stay in the files marked `excluded = true`, and one loader removes them:
+
+```python
+from splits import load_split          # run scripts from the repo root: python src/...
+train = load_split("train")            # 3,067 pairs / 6,134 records
+dev   = load_split("dev")              #   619 pairs / 1,238 records
+test  = load_split("test")             #   614 pairs / 1,228 records - M6 only
+```
+
+Never read `data/splits/*.jsonl` directly in a training or evaluation script. `load_split` also
+refuses to run if the merge has not been applied, which catches a rebuilt corpus that lost its
+annotation.
+
+### 3.5 Rebuilding
 
 ```bash
 python src/build_bn_pool.py     # only if the raw pool changed
 python src/build_corpus.py      # the filter and the splits
+python src/merge_annotation.py  # restores types + `excluded` - a rebuild resets them
 python src/audit.py --data data/splits    # MUST pass before using the result
 ```
 
@@ -300,10 +320,21 @@ If κ is low, the usual cause is that "hallucination" is under-defined for edge 
 
 If the 20% sample shows > 5% label noise, verify more.
 
-**Measured at M3:** the train spot-check annotator disagreed with the corpus label on 40 of the
-1,203 rows they could decide (**3.3%**), and dev shows the same rate (43 / 1,314). That is under
-the 5% threshold, so by this rule train does not need wider label verification. The disputed rows
+**Measured at M3, after adjudication:** 56 of the 1,252 train spot-check records carry a label that
+human review confirmed wrong (**4.5%**): 28 stored-correct answers the annotator judged wrong, and
+28 stored-wrong answers the adjudicator confirmed correct. That is under the 5% threshold, so by
+this rule train does not need wider label verification. At pair level, 62 of the 626 checked
+train pairs are flagged (dev 54 / 673, test 64 / 678) — how they are treated is PRD Q5. The disputed rows
 are listed in `data/annotated/round1/label_disputes.csv`; labels are never changed by the merge.
+
+**Hallucination types follow the same scope (PRD §5.1c, decided 2026-09-17).** A type is required
+for every wrong answer in test, dev and the train spot-check (1,977), not for the other 2,503 train
+wrong answers. Types are reporting metadata and are only ever broken down on dev/test, so typing
+the rest of train would change no reported number. Those records keep
+`hallucination_type = unlabeled` with `type_source = outside_train_sample`.
+
+**Never use `hallucination_type`, `type_source`, `annotator_1/2` or `adjudicated` as model
+inputs** — every one of them reveals the label.
 
 ---
 
@@ -662,7 +693,9 @@ Also report: accuracy, per-class precision/recall, AUROC, confusion matrix.
 Report **separately** for:
 - has-context vs. no-context
 - easy vs. hard
-- per hallucination type
+- per subject
+- per hallucination type — **dev and test only**; filter out `hallucination_type == "unlabeled"`
+  (adjudicator skip/dispute) and say so in the table caption
 - human-written holdout vs. generated
 
 ### 12.2 Statistical rigour

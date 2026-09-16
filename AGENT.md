@@ -40,8 +40,11 @@ no Banglish anywhere in Phase 1.
 > **A high score on an artifacted corpus is a failed deliverable.**
 >
 > **And a has-context score reported without its string-matcher baseline is not a result.**
-> The rule "if the answer appears in the passage, call it correct" already scores **0.812** on
-> all has-context items, and **0.456** on the hard subset. Quote both, every time.
+> The rule "if the answer appears in the passage, call it correct" already scores **0.823** on
+> all usable has-context items, and **0.454** on the hard subset. Quote both, every time.
+>
+> **Load data only through `src/splits.py`.** It drops the 180 human-flagged pairs that are
+> excluded from training and scoring (PRD §5.1d).
 >
 > **RAG is forbidden.** No retrieval at inference of any kind — see PRD §5.3a. **The corpus is
 > final:** do not collect or generate more data. **QA only:** no fill-in-the-blank / cloze items.
@@ -157,8 +160,12 @@ project/
 
 **Where the project is right now:** M1 done (corpus built, gate passing at 0.534).
 **M2 PASSED** - kappa = 0.717 on 100 blind items (see agreement_test_v1/IAA_REPORT.md).
-**M3 is the current gate** - sheets are built in `data/annotated/round1/`; 5,310 judgements
-remain before `hallucination_type` stops being 'unlabeled'.
+**M3 DONE** - all 5,310 judgements in `data/annotated/round1/` are done (test kappa = 0.865),
+253 rows adjudicated, merged into corpus + splits (strict audit passes). 180 human-flagged
+pairs are excluded from training and scoring (PRD 5.1d) - usable: train 3,067 / dev 619 /
+test 614 pairs. **M4 (model ladder) is next.** D8 is narrowed to
+test + dev + the 20% train spot-check (PRD 5.1c); the other train records stay 'unlabeled' with
+`type_source = outside_train_sample` by design.
 
 **Convention:** logic lives in `src/`, notebooks orchestrate and visualise. A notebook cell that
 defines a training loop is a code smell - move it to `src/` and import it. Every `build_*.py` is
@@ -249,7 +256,7 @@ A 62,084-record QA pool has been ingested. Three facts govern how it may be used
 |---|---|
 | **Source labels already match the project convention** (`1 = correct`) | No flip anywhere. Still load via `data/interim/bn_pool.jsonl` — that stage does the dedup and schema mapping. |
 | **The pool is Bengali script** (0.96% Latin) | Correct and expected — Phase 1 is Bengali. `src/build_corpus.py` filters it to the 4,480-pair corpus. |
-| **A substring rule scores 0.812 macro-F1 on has-context** | Correct answers are verbatim spans of the passage far more often than wrong ones. Handled by the `difficulty` field, not by deletion: on the **hard** subset the same rule scores 0.456. Always report both. |
+| **A substring rule scores 0.823 macro-F1 on has-context** (usable data; 0.812 before exclusion) | Correct answers are verbatim spans of the passage far more often than wrong ones. Handled by the `difficulty` field, not by deletion: on the **hard** subset the same rule scores 0.454. Always report both. |
 
 The PRD's own metadata gate (V1) **passes** on this pool at 0.453–0.506 — notable because the
 pool *was* LLM-constructed, so the classic generation artifact could have been there and isn't.
@@ -409,7 +416,7 @@ MLM, 15% masking, `lr=1e-5`, batch 32, 5 epochs, on unlabeled transliterated Ban
 | Rule | Detail |
 |---|---|
 | **Primary metric** | macro-F1 (also report accuracy, per-class P/R, AUROC, confusion matrix) |
-| **Always split results** | has-context vs no-context; easy vs hard; per hallucination type; human-written vs generated |
+| **Always split results** | has-context vs no-context; easy vs hard; per subject; per hallucination type (**dev/test only** — PRD 5.1c); human-written vs generated |
 | **Cross-validation** | 5-fold stratified on **train+dev** |
 | **Seeds** | 3 seeds (42/1337/2024), report **mean ± std** |
 | **Significance** | McNemar's test for pairwise comparison; bootstrap 95% CI (1000 resamples) on the headline |

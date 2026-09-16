@@ -14,6 +14,8 @@ and writes into `data/corpus/bn_v1/corpus.jsonl` and `data/splits/*.jsonl`:
     type_source          where that type came from (see below)
     annotator_1/2        each human's binary label: 1 correct, 0 wrong, null unsure
     adjudicated          true when a disagreement was settled by the adjudicator
+    excluded             true on BOTH records of a pair human review found unusable
+    exclusion_reason     why, '+'-joined; empty when not excluded
 
 Run from the repository root:
 
@@ -51,10 +53,31 @@ or both said `correct`, someone marked `unsure` -- goes to
 corpus label itself is wrong; leave unlabeled and fix at the source). The file is
 regenerated on every run and keeps the decisions already written in it.
 
-Wrong answers no sheet covers (80% of train) stay `unlabeled`, unless
-`--with-llm` is given and `data/annotated/llm_round1/` holds judge output from
-`src/llm_annotate.py`; those get `type_source = llm_consensus` so they can never
-be mistaken for human work.
+SCOPE OF D8 (narrowed 2026-09-17, PRD §5.1c): a type is required for every wrong
+answer in test, dev and the 20% train spot-check -- not for the other 80% of
+train. Types are reporting metadata; no model trains on them, so typing train
+records nobody reports on would cost ~2,500 annotations and change no result.
+Those records stay `unlabeled` with `type_source = outside_train_sample`, which
+marks them as out of scope by design rather than forgotten. (With `--with-llm`
+and judge output from `src/llm_annotate.py` in `data/annotated/llm_round1/`,
+they can be filled instead, marked `llm_consensus`. Not needed for D8.)
+
+EXCLUDED PAIRS (PRD Q5 / §5.1d, decided 2026-09-17)
+---------------------------------------------------
+A pair is left out of BOTH training and scoring when human review showed its
+stored labels cannot be trusted:
+
+    wrong_answer_confirmed_correct  the adjudicator marked the stored-wrong answer `dispute`
+    broken_item                     the adjudicator marked it `skip`
+    correct_answer_judged_wrong     every annotator who saw the stored-correct answer
+                                    said `wrong` (both on test, the one on dev/train)
+
+The pair is dropped whole, never one record of it: removing one answer would
+break the 50/50 balance and the pairing that splits rely on. Records stay in
+the files, marked `excluded = true`; `src/splits.py` filters them out, so the
+decision is applied the same way by every script and stays auditable. Only
+human-checked pairs can be flagged, so the unchecked 80% of train keeps its
+measured ~4.5% label noise.
 
 Rerun this script after any `src/build_corpus.py` rebuild -- a rebuild resets
 every type to `unlabeled`. It recomputes everything from the sheets each time,
@@ -250,7 +273,8 @@ def main() -> None:
             if t and t in ALLOWED[r["condition"]]:
                 new[rid] = {**fields, "hallucination_type": t, "type_source": "llm_consensus"}
             else:
-                new[rid] = {**fields, "hallucination_type": "unlabeled", "type_source": "not_annotated"}
+                new[rid] = {**fields, "hallucination_type": "unlabeled",
+                            "type_source": "outside_train_sample"}
             continue
 
         t, why = settle(r, vs)
@@ -271,6 +295,21 @@ def main() -> None:
                 bad_decisions.append(f"{iid}: {decision!r} is not one of "
                                      f"{sorted(ALLOWED[r['condition']])} or skip/dispute")
             new[rid] = {**fields, "hallucination_type": "unlabeled", "type_source": "awaiting_adjudication"}
+
+    # -- PRD Q5: pairs whose labels human review could not trust ----------------
+    pair_reasons: dict[str, set[str]] = collections.defaultdict(set)
+    for r in corpus_rows:
+        src, vs = new[r["id"]]["type_source"], votes.get(r["id"], [])
+        if src == "adjudicator_dispute":
+            pair_reasons[r["pair_id"]].add("wrong_answer_confirmed_correct")
+        elif src == "adjudicator_skip":
+            pair_reasons[r["pair_id"]].add("broken_item")
+        if r["label"] == 1 and vs and all(v["label"] == 0 for _, v in vs):
+            pair_reasons[r["pair_id"]].add("correct_answer_judged_wrong")
+    for r in corpus_rows:
+        reasons = sorted(pair_reasons.get(r["pair_id"], ()))
+        new[r["id"]]["excluded"] = bool(reasons)
+        new[r["id"]]["exclusion_reason"] = "+".join(reasons)
 
     if bad_decisions:
         print(f"*** {len(bad_decisions)} invalid decision(s) in {ADJUDICATION}; nothing written ***")
@@ -318,6 +357,18 @@ def main() -> None:
     typed_all = sum(1 for r in wrong_all if new[r["id"]]["hallucination_type"] != "unlabeled")
     print(f"  {'all':<7}{len(wrong_all):>14,}{typed_all:>8,}{typed_all/len(wrong_all):>10.1%}")
 
+    # D8 covers test + dev + the train spot-check (PRD §5.1c), i.e. every wrong
+    # answer some human looked at. Adjudicator skip/dispute are reported
+    # exclusions, not gaps: those items cannot be honestly typed.
+    in_scope = [r for r in wrong_all if new[r["id"]]["type_source"] != "outside_train_sample"]
+    scope_src = collections.Counter(new[r["id"]]["type_source"] for r in in_scope)
+    in_scope_typed = sum(1 for r in in_scope if new[r["id"]]["hallucination_type"] != "unlabeled")
+    excluded = scope_src["adjudicator_skip"] + scope_src["adjudicator_dispute"]
+    waiting = scope_src["awaiting_adjudication"]
+    print(f"\n  D8 scope (test + dev + train sample): {len(in_scope):,} wrong answers, "
+          f"{in_scope_typed:,} typed, {excluded:,} excluded by adjudicator, "
+          f"{waiting:,} awaiting adjudication -> D8 {'MET' if waiting == 0 else 'NOT MET'}")
+
     print("\n  type distribution among typed wrong answers:")
     for cond in ("has_context", "no_context"):
         c = collections.Counter(new[r["id"]]["hallucination_type"] for r in wrong_all
@@ -333,6 +384,14 @@ def main() -> None:
     print(f"\n  label disputes: {len(dispute_rows):,} records where a human disagrees with the "
           f"corpus label ({unanimous:,} where every annotator does) -> {DISPUTES}")
     print("    Labels are never changed here. These are a corpus finding to report.")
+
+    print("\n  excluded from training and scoring (PRD Q5):")
+    for split in ("train", "dev", "test"):
+        pids = {corpus[rid]["pair_id"] for rid in split_ids[split]}
+        out = {p for p in pids if p in pair_reasons}
+        why = collections.Counter(r for p in out for r in pair_reasons[p])
+        print(f"    {split:<6}{len(out):>4} of {len(pids):>5,} pairs -> {len(pids)-len(out):>5,} usable   "
+              + ", ".join(f"{k} {v}" for k, v in why.most_common()))
 
     if args.dry_run:
         print("\n  DRY RUN - corpus and splits untouched.")

@@ -7,7 +7,9 @@
 > If this document and any other file disagree, **this document wins**, and the other file
 > should be fixed.
 
-Last updated: 2026-08-23 — the project moved from Banglish-first to Bengali-first. See §14.
+Last updated: 2026-09-17 — human-flagged pairs excluded from training and scoring (§5.1d);
+D8 narrowed to test + dev + train spot-check (§5.1c).
+2026-08-23 — the project moved from Banglish-first to Bengali-first (§14).
 
 ---
 
@@ -81,8 +83,9 @@ to compare them on.
 | G6 | Reproducible pipeline and complete experiment log | In place |
 
 **G4 changed, and the change matters.** The original target was 0.80 on all has-context items. A
-plain string matcher already scores **0.812** there, so that target measured nothing. The target
-is now the **hard subset**, where the same string matcher gets 0.456. See §5.5.
+plain string matcher already scores **0.823** there (on the usable data, §5.1d), so that target
+measured nothing. The target is now the **hard subset**, where the same string matcher gets
+**0.454**. See §5.5.
 
 ### 3.2 Non-goals — deferred to Phase 2
 
@@ -168,12 +171,78 @@ one subject is a finding about the corpus, not annotator failure.
 | D5 | Cohen's κ ≥ 0.60 on the binary label | Must | ✅ 0.717 (M2, 100-item pilot) and ✅ 0.865 (full 1,356-item test split) |
 | D6 | No subject excluded for difficulty; QA-only (no cloze) | Must | ✅ 13 subjects |
 | D7 | Pairs never split across train/dev/test | Must | ✅ verified |
-| D8 | Hallucination type labelled for every `label == 0` item | Must | ⬜ merge tool ready (`src/merge_annotation.py`, dry-run verified). Settled by humans: test 487/678, dev 648/673, train 589/3,129 = 1,724/4,480 (38.5%). 253 await adjudication; 2,503 train records were never in the 20% sample. Corpus still shows `unlabeled` until the merge is run |
+| D8 | Hallucination type labelled for every `label == 0` item **in test, dev, and the 20% train spot-check** (scope narrowed — see §5.1c) | Must | ✅ met 2026-09-17: of 1,977 in-scope wrong answers, 1,867 typed (1,724 by annotator agreement, 143 adjudicated), 110 excluded by the adjudicator (89 dispute, 21 skip). Merged into corpus + splits. The other 2,503 train wrong answers are out of scope by design |
 | D9 | Easy/hard difficulty labelled | Must | ✅ by construction (§5.5) |
 | D10 | Licence recorded for every source before ingestion | Must | ⚠ 2 open questions |
 | D11 | `script_condition` and `cmi` populated (Phase 2 payload — never evaluated on) | Should | ✅ |
 | D12 | `error_span` captured where available | Could | ⬜ |
 | D13 | No PII in released data | Must | ⬜ scan pending |
+| D14 | Pairs human review found unusable are excluded from training **and** scoring (§5.1d) | Must | ✅ 180 pairs flagged `excluded`; `src/splits.py` filters them |
+
+### 5.1c Decision — D8 covers test, dev and the train spot-check only (2026-09-17)
+
+**Decision by the project owner.** D8 originally required a hallucination type on every wrong
+answer in the corpus (4,480). It now requires one on every wrong answer a human checked: all of
+test (678), all of dev (673), and the 20% train spot-check (626) — **1,977** in total.
+
+**Why this is sound, not a shortcut:**
+
+| Reason | Detail |
+|---|---|
+| Types are reporting metadata | They exist so results can be broken down by error kind (§5.4). No model is trained on or given the type; it would reveal the label. |
+| Type breakdowns are reported on dev and test only | Nobody reports a result on train, so a type on a train record is never read by any table. |
+| The labels themselves are unaffected | D8 is about the *type*. The *binary label* on all train records stays, and the spot-check measured its confirmed noise at **4.5%** after adjudication (56 of 1,252
+records), under the 5% threshold that would trigger wider verification (guide §5.3). |
+| The saving is large and the cost is zero | ~2,500 annotations that would change no reported number. |
+
+**What this does *not* change:** D4 (test fully double-annotated) and D5 (κ ≥ 0.60) are untouched,
+and so is every model input.
+
+**How it is recorded in the data.** Out-of-scope train records keep
+`hallucination_type = unlabeled` with `type_source = outside_train_sample`, so "not required" can
+never be confused with "forgotten". Items the adjudicator marks `skip` or `dispute` are reported
+exclusions (`adjudicator_skip` / `adjudicator_dispute`). `src/audit.py` flags `unlabeled` only
+where D8 still requires a type.
+
+**Reporting obligation.** Any per-type table must say it covers dev/test, and the report must state
+that train types were sampled (20%) rather than exhaustive.
+
+### 5.1d Decision — human-flagged pairs are left out of training and scoring (2026-09-17)
+
+**Decision by the project owner (resolves Q5).** A pair is excluded when human review showed its
+labels cannot be trusted:
+
+| Reason (`exclusion_reason`) | Meaning | train | dev | test |
+|---|---|---:|---:|---:|
+| `wrong_answer_confirmed_correct` | the adjudicator marked the stored-wrong answer `dispute` | 28 | 19 | 42 |
+| `correct_answer_judged_wrong` | every annotator who saw the stored-correct answer said `wrong` | 28 | 34 | 17 |
+| `broken_item` | the adjudicator marked it `skip` | 8 | 5 | 8 |
+| **pairs excluded** (a pair can have two reasons) | | **62** | **54** | **64** |
+| **usable pairs** | | **3,067** | **619** | **614** |
+
+**Why.** Scoring a model against a label humans confirmed wrong penalises it for being right, and
+training on one teaches it the error. The rule was fixed **before any model was trained or
+scored**, and uses only human judgements, so it cannot be tuned to favour a result.
+
+**How it is applied.**
+
+- The whole pair is dropped, never one record: that keeps the 50/50 balance and the pairing the
+  splits rely on.
+- Nothing is deleted. Both records stay in the files with `excluded = true` and an
+  `exclusion_reason`, so the decision is auditable and reversible.
+- Every training and evaluation script loads data through `src/splits.py`, which removes excluded
+  pairs by default. There is one place that applies the rule.
+- `src/audit.py` runs the gate on all records *and* on the usable records; both must pass (0.534
+  and 0.514).
+
+**Consequences to report.**
+
+- The string-matcher baselines are re-measured on the usable data and become the reference
+  numbers (§5.5): **0.823** all has-context, **0.987** easy, **0.454** hard.
+- Only human-checked pairs can be flagged. The unchecked 80% of train keeps its measured ~4.5%
+  label noise, which is under the 5% rule (guide §5.3).
+- The labels themselves are never edited (§5.1a). The excluded pairs are a corpus finding: the
+  report must state how many were excluded, for which reasons, and in which split.
 
 ### 5.1a Label convention — project-wide, non-negotiable
 
@@ -194,7 +263,7 @@ reverse of most hallucination papers — there, positive usually means hallucina
 | Intrinsic (has-context) | `entity`, `numeric`, `relational`, `contradiction` |
 | Extrinsic (no-context) | `fabricated`, `overclaim` |
 | Correct answers | `none` |
-| Not yet annotated | `unlabeled` |
+| Not yet annotated, or out of D8 scope (train outside the spot-check, §5.1c) | `unlabeled` |
 
 ### 5.3 Model requirements
 
@@ -236,7 +305,8 @@ ladder in §5.3 may be *extended* but not *replaced*.
 
 - Primary metric: **macro-F1**. Also report accuracy, per-class P/R/F1, and AUC.
 - **Always break results down by:** has-context vs no-context, **easy vs hard**, **by subject**,
-  and (once annotated) hallucination type.
+  and hallucination type. The type breakdown is computed on **dev and test only** — train types
+  exist only for the 20% spot-check (§5.1c).
 - Subject breakdown is required because `law`, `science`, `bcs` and `literature` need outside
   knowledge a closed-book model does not have. A collapse there is a finding, not a defect.
 - Never report a single averaged number on its own. It hides the only differences that matter.
@@ -247,7 +317,7 @@ ladder in §5.3 may be *extended* but not *replaced*.
 
 | ID | Requirement | Status |
 |---|---|---|
-| V1 | Metadata-only shortcut probe scores **< 0.60** macro-F1 | ✅ 0.534 |
+| V1 | Metadata-only shortcut probe scores **< 0.60** macro-F1 — on all records **and** on the usable records | ✅ 0.534 / 0.514 |
 | V2 | Audit rerun after any change to corpus construction | ✅ enforced |
 | V3 | Answer-only probe substantially below the full-input model | ⬜ needs a model |
 | V4 | Every has-context score reported next to the string-matcher baseline | ⬜ enforce at M5 |
@@ -259,11 +329,15 @@ it pass is the single most damaging thing anyone can do to this project.
 **The string-matcher baseline (V4).** The rule *"if the answer text appears in the passage,
 call it correct"* scores:
 
-| Slice | n (records) | String-matcher macro-F1 |
+| Slice | Usable records (§5.1d) — **the reference** | All records (before exclusion) |
 |---|---:|---:|
-| All has-context | 5,376 | **0.812** |
-| Easy subset | 3,522 | 0.980 |
-| **Hard subset** | 1,854 | **0.456** |
+| All has-context | **0.823** (n = 5,092) | 0.812 (n = 5,376) |
+| Easy subset | 0.987 (n = 3,398) | 0.980 (n = 3,522) |
+| **Hard subset** | **0.454** (n = 1,694) | 0.456 (n = 1,854) |
+
+Models are trained and scored on usable records only, so the left column is what every score is
+compared with. When a score is reported on dev or test, the baseline is recomputed on that same
+split, so both numbers always describe identical records.
 
 This is a property of the source data: correct answers in extractive QA tend to be verbatim spans
 of the passage, and the generated wrong answers usually are not. `difficulty` encodes it —
@@ -289,8 +363,8 @@ to actually read. A has-context score is meaningless without the hard-subset num
 
 | Metric | Target | Baseline to beat |
 |---|---|---|
-| macro-F1, has-context **hard subset** | **≥ 0.80** | 0.456 (string matcher) |
-| macro-F1, has-context overall | report only | 0.812 (string matcher) |
+| macro-F1, has-context **hard subset** | **≥ 0.80** | 0.454 (string matcher, usable data) |
+| macro-F1, has-context overall | report only | 0.823 (string matcher, usable data) |
 | macro-F1, no-context | **≥ 0.60** | 0.333 (majority class) |
 | Metadata shortcut probe | **< 0.60** | — |
 | Cohen's κ | **≥ 0.60** | — |
@@ -336,7 +410,7 @@ trained rather than prompted — so do not claim a head-to-head win.
 | M0 | Foundations: repo, schema, seeds, source pool ingested and audited | Audit written | ✅ |
 | M1 | Corpus built, filtered for validity (QA only), split by pair | **V1 metadata probe < 0.60** | ✅ 0.534 |
 | M2 | Annotation protocol proven | **Cohen's κ ≥ 0.60** on 100 blind items | ✅ **0.717** |
-| M3 | Full corpus annotated, splits locked | D4, D8 met | ⬜ annotation done (κ 0.865), merge tool built — **current:** adjudicate 253 rows, then run the merge |
+| M3 | Corpus annotated (test + dev + train spot-check), splits locked | D4, D8 (§5.1c) met | ✅ κ 0.865; 253 rows adjudicated; merged 2026-09-17; strict audit passes (0.534 / 0.514 usable). Q5 decided (§5.1d) |
 | M4 | Model ladder trained (M1–M7) | All families logged | ⬜ |
 | M5 | Sweeps, further pretraining, ensemble | V3, V4 enforced | ⬜ |
 | M6 | Final evaluation on `test.jsonl` — **once** | Targets in §6.1 | ⬜ |
@@ -395,6 +469,7 @@ trained rather than prompted — so do not claim a head-to-head win.
 | Q2 | Did the BCS questions come from an official PSC source or a commercial compilation? | Release of those items |
 | Q3 | What licence does the released corpus carry? (Wikipedia share-alike likely forces CC BY-SA 4.0) | DL1, DL4 |
 | Q4 | Which Claude model and prompts produced the original QA pairs? | R3 |
+| Q5 | ~~How are the 180 human-flagged pairs treated?~~ **Decided 2026-09-17: excluded from training and scoring** — §5.1d | — |
 
 ---
 

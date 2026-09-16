@@ -146,6 +146,12 @@ def probe_overlap(rows: list[dict]) -> float | None:
     )
     score = f1_score(y, predictions, average="macro")
     print(f"  context-substring rule F1   = {score:.3f}   (has-context only, n={len(grounded):,})")
+    # PRD V4: every has-context score is reported beside these three numbers
+    for level in ("easy", "hard"):
+        idx = [i for i, r in enumerate(grounded) if r.get("difficulty") == level]
+        if idx:
+            sub = f1_score(y[idx], predictions[idx], average="macro")
+            print(f"    {level:<4} subset               = {sub:.3f}   (n={len(idx):,})")
     if score >= 0.70:
         print("    WARNING: faithful answers are largely copied verbatim from the context.")
         print("    A string matcher solves this split without detecting hallucination.")
@@ -186,11 +192,23 @@ def structural_checks(rows: list[dict]) -> list[str]:
             problems.append(f"{r['id']}: label=0 (hallucinated) but hallucination_type=none")
             break
 
-    unlabeled = sum(1 for r in rows if r.get("hallucination_type") == "unlabeled")
-    if unlabeled:
+    # PRD D8 (narrowed, section 5.1c): a type is required for every wrong answer
+    # in test, dev and the 20% train spot-check. 'unlabeled' is expected on the
+    # rest of train and on items the adjudicator skipped or disputed.
+    out_of_scope = {"outside_train_sample", "adjudicator_skip", "adjudicator_dispute"}
+    unlabeled = [r for r in rows if r.get("hallucination_type") == "unlabeled"]
+    not_merged = sum(1 for r in unlabeled if "type_source" not in r)
+    in_scope_gap = sum(1 for r in unlabeled
+                       if "type_source" in r and r["type_source"] not in out_of_scope)
+    if not_merged:
         problems.append(
-            f"{unlabeled:,} records carry provisional hallucination_type='unlabeled' "
-            "(not human-annotated; PRD D8 unmet)"
+            f"{not_merged:,} records carry hallucination_type='unlabeled' and no annotation "
+            "has been merged (run src/merge_annotation.py; PRD D8 unmet)"
+        )
+    if in_scope_gap:
+        problems.append(
+            f"{in_scope_gap:,} records inside D8 scope are still 'unlabeled' "
+            "(awaiting adjudication; PRD D8 unmet)"
         )
 
     # Phase 1 is Bengali script only (PRD section 7.1); Banglish is Phase 2.
@@ -200,6 +218,14 @@ def structural_checks(rows: list[dict]) -> list[str]:
             f"{not_bengali:,} records are not script_condition='bengali_script' — "
             "Phase 1 is Bengali only (PRD section 7.1)"
         )
+
+    # PRD Q5: exclusion is per pair - both records flagged, or neither
+    if any("excluded" in r for r in rows):
+        by_pair = collections.defaultdict(set)
+        for r in rows:
+            by_pair[r.get("pair_id", r["id"])].add(bool(r.get("excluded")))
+        if split_pairs := [p for p, v in by_pair.items() if len(v) > 1]:
+            problems.append(f"{len(split_pairs)} pair(s) have only one record excluded (e.g. {split_pairs[0]})")
 
     annotated = sum(1 for r in rows if r.get("annotator_1") is not None)
     if annotated == 0:
@@ -228,16 +254,29 @@ def main() -> int:
     print(f"CORPUS AUDIT — {args.data}  ({len(rows):,} records)")
     print("=" * 68)
 
-    print("\nPROBES (grouped split, no pair spans train/test)")
-    metadata_score = None
-    if args.probe in ("all", "metadata"):
-        metadata_score = probe_metadata(rows)
-    if args.probe in ("all", "answer-only"):
-        probe_answer_only(rows)
-    if args.probe in ("all", "overlap"):
-        probe_overlap(rows)
-    if args.probe == "all":
-        probe_prior(rows)
+    def run_probes(subset: list[dict]) -> float | None:
+        score = None
+        if args.probe in ("all", "metadata"):
+            score = probe_metadata(subset)
+        if args.probe in ("all", "answer-only"):
+            probe_answer_only(subset)
+        if args.probe in ("all", "overlap"):
+            probe_overlap(subset)
+        if args.probe == "all":
+            probe_prior(subset)
+        return score
+
+    print("\nPROBES - all records (grouped split, no pair spans train/test)")
+    gate_scores = {"all records": run_probes(rows)}
+
+    # PRD Q5: models train and are scored without the excluded pairs, so the
+    # gate must also hold on exactly that data. Both must pass.
+    if any(r.get("excluded") for r in rows):
+        clean = [r for r in rows if not r.get("excluded")]
+        print(f"\nPROBES - usable records only ({len(clean):,}; "
+              f"{len(rows) - len(clean):,} in excluded pairs removed, PRD Q5)")
+        gate_scores["usable records"] = run_probes(clean)
+    metadata_score = None if None in gate_scores.values() else max(gate_scores.values())
 
     print("\nSTRUCTURAL CHECKS")
     problems = structural_checks(rows)
@@ -250,6 +289,9 @@ def main() -> int:
     print("\n" + "=" * 68)
     failed = False
     if metadata_score is not None:
+        if len(gate_scores) > 1:
+            print("metadata probe: " + ", ".join(f"{k} {v:.3f}" for k, v in gate_scores.items())
+                  + "  (gate uses the worse)")
         if metadata_score >= GATE_BLOCKING:
             print(f"GATE V1 FAILED: metadata probe {metadata_score:.3f} >= {GATE_BLOCKING}")
             print("Fix the generation prompt and regenerate. Do not adjust this threshold.")

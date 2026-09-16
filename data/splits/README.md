@@ -12,8 +12,14 @@ Deterministic, seed 42.
 70 / 15 / 15 by pair, split separately inside every (condition, subject) group, so each split is
 60% has-context and 50/50 correct vs hallucinated, with the same subject mix.
 
+**Excluded pairs (PRD §5.1d).** 180 pairs that human review found broken or wrongly labelled are
+marked `excluded = true` and left out of training and scoring. Usable: train 3,067 pairs / 6,134
+records · dev 619 / 1,238 · test 614 / 1,228. **Load data with `src/splits.py`** — never read these
+files directly in a training or evaluation script.
+
 **Annotation lives in these files after M3.** `src/merge_annotation.py` writes
-`hallucination_type`, `type_source`, `annotator_1/2` and `adjudicated` into them from
+`hallucination_type`, `type_source`, `annotator_1/2`, `adjudicated`, `excluded` and
+`exclusion_reason` into them from
 `data/annotated/round1/`. Rebuilding with `src/build_corpus.py` resets those fields, so rerun the
 merge after any rebuild.
 

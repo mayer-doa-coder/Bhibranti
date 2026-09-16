@@ -91,8 +91,9 @@ So far we have finished (1) up to the final merge. (2) has not started yet.
 | 7 | Shortcut audit (the gate) | ✅ passing | metadata probe **0.534** (must be < 0.60) |
 | 8 | Guidelines + 100-item agreement test | ✅ passed | Cohen's κ **0.717** (must be ≥ 0.60) |
 | 9 | Full human annotation | ✅ done | 5,310 rows; test κ **0.865** |
-| 10 | **Merge annotation into the corpus** | 🔶 **current** | tool built and verified; 253 rows await a decision |
-| 11 | Model ladder (N-gram → … → BERT) | ⬜ not started | — |
+| 10 | Merge annotation into the corpus | ✅ done | 253 rows adjudicated; D8 met; strict audit passes |
+| 10b | Leave out human-flagged pairs (PRD Q5) | ✅ done | 180 pairs excluded; usable: 3,067 / 619 / 614 pairs |
+| 11 | **Model ladder (N-gram → … → BERT)** | 🔶 **next** | — |
 | 12 | Final test evaluation (once only) | ⬜ not started | — |
 
 In the project requirements document ([PRD.md](PRD.md)) these are milestones **M0** (steps 0–3),
@@ -323,7 +324,8 @@ answers usually are not. So this dumb rule —
 
 > *"If the answer's text appears in the passage, say correct; otherwise say wrong."*
 
-— already scores **macro-F1 = 0.812** on all has-context records, **without understanding anything**.
+— already scores **macro-F1 = 0.823** on the usable has-context records (0.812 on all of them),
+**without understanding anything**.
 
 That means a real model scoring 0.82 has learned almost nothing beyond string matching. We need a
 way to see past this.
@@ -362,15 +364,19 @@ way to see past this.
 
 And the string-matching rule on has-context **records**:
 
-| Slice | Records | String-matcher macro-F1 | What it tells us |
+| Slice | Usable records (§14.6) — **reference** | All records | What it tells us |
 |---|---:|---:|---|
-| All has-context | 5,376 | **0.812** | the number to beat, but it is inflated |
-| Easy | 3,522 | 0.980 | the shortcut solves these almost perfectly |
-| **Hard** | **1,854** | **0.456** | **worse than guessing** — the shortcut is useless here |
+| All has-context | **0.823** (5,092) | 0.812 (5,376) | the number to beat, but it is inflated |
+| Easy | 0.987 (3,398) | 0.980 (3,522) | the shortcut solves these almost perfectly |
+| **Hard** | **0.454** (1,694) | 0.456 (1,854) | **worse than guessing** — the shortcut is useless here |
+
+The "usable" column leaves out 180 pairs that human review found broken or wrongly labelled
+(§14.6). Models train and are scored on that data, so those are the numbers to compare with.
 
 **Why this matters for the whole project:** our target is **macro-F1 ≥ 0.80 on the hard subset**,
-not on all items. Every has-context score we ever report will have 0.812 and 0.456 written next to
-it, so no one (including us) can be fooled by the shortcut.
+not on all items. Every has-context score we ever report will have the string-matcher score for
+the same records (0.823 and 0.454 on the usable data) written next to it, so no one — including
+us — can be fooled by the shortcut.
 
 **Why difficulty is *measured* and not *filtered*:** we keep both easy and hard items and report
 them separately. The *gap* between easy and hard is itself one of the findings.
@@ -425,9 +431,9 @@ away through some side channel, and a real model would learn that side channel t
 
 | Probe | What it is allowed to see | Score | Verdict |
 |---|---|---:|---|
-| **Metadata-only** (the gate) | only surface features of the answer: word count, character count, average word length, share of Latin letters, counts of `, . ? ! "`, share of digits, share of capitals | **0.534** | ✅ **PASS** (must be < 0.60; < 0.55 counts as "clean") |
+| **Metadata-only** (the gate) | only surface features of the answer: word count, character count, average word length, share of Latin letters, counts of `, . ? ! "`, share of digits, share of capitals | **0.534** all · **0.514** usable | ✅ **PASS** on both (must be < 0.60; < 0.55 counts as "clean") |
 | Answer-only character n-grams | the answer text, but no question and no passage | 0.542 | mild signal only — good |
-| String matcher | "is the answer in the passage?" | 0.812 | the shortcut from §9 — reported, not hidden |
+| String matcher | "is the answer in the passage?" | 0.812 all · 0.823 usable | the shortcut from §9 — reported, not hidden |
 | Majority class | always predicts the same label | 0.333 | sanity floor |
 
 **How to read 0.534:** a model that only sees the *shape* of the answer — how long it is, whether it
@@ -657,7 +663,7 @@ python src/audit.py --data data/splits       # always re-check the gate afterwar
 | test, wrong answer, **both** annotators said wrong **and** chose the **same** type | that type | `double_annotated` |
 | dev/train, wrong answer, the annotator said wrong and chose a type | that type | `single_annotated` |
 | anything else (types differ, someone said correct, someone was unsure) | goes to **adjudication** | `awaiting_adjudication` → `adjudicated` once decided |
-| train record outside the 20% sample | `unlabeled` | `not_annotated` |
+| train record outside the 20% sample | `unlabeled` (not required — §14.5) | `outside_train_sample` |
 
 It also fills `annotator_1` / `annotator_2` (each human's 1/0, or empty for unsure) and
 `adjudicated`.
@@ -668,12 +674,12 @@ It also fills `annotator_1` / `annotator_2` (each human's 1/0, or empty for unsu
 
 ### 14.3 What the dry run shows (17 September 2026)
 
-| Split | Wrong answers | Type settled by humans | Waiting for adjudication | Never sampled |
+| Split | Wrong answers that need a type | Type settled by humans | Waiting for adjudication | Out of scope (§14.5) |
 |---|---:|---:|---:|---:|
 | test | 678 | 487 (71.8%) | 191 | — |
 | dev | 673 | 648 (96.3%) | 25 | — |
-| train | 3,129 | 589 (18.8%) | 37 | 2,503 |
-| **total** | **4,480** | **1,724 (38.5%)** | **253** | **2,503** |
+| train (20% sample) | 626 | 589 (94.1%) | 37 | 2,503 |
+| **total** | **1,977** | **1,724 (87.2%)** | **253** | **2,503** |
 
 Why test needs the most adjudication: two people must agree on *both* the label *and* the type.
 Of the 191: 81 have different types (mostly `relational` vs `entity`), 49 are correct-vs-wrong
@@ -694,9 +700,9 @@ in **116** of them every annotator who looked disagrees. Most often the corpus c
 correct and the humans call it wrong (79 of the 116).
 
 **Is the training data still trustworthy?** The plan's rule ([guide §5.3](IMPLEMENTATION_GUIDE.md))
-says: *if the 20% sample shows more than 5% label noise, verify more.* The train sample shows
-**3.3%** (40 disputed of 1,203 decidable rows), and dev shows the same rate. So, by our own
-pre-set rule, the train labels are sound. Some errors do remain in the unchecked 80% — for example
+says: *if the 20% sample shows more than 5% label noise, verify more.* After adjudication, the
+train sample shows **4.5%** confirmed wrong labels (56 of 1,252 records). So, by our own pre-set
+rule, the train labels are sound — though close enough to the limit to report plainly. Some errors do remain in the unchecked 80% — for example
 this train pair nobody sampled:
 
 > **Question:** চিত্তভূষণ দাশগুপ্ত কবে জন্মগ্রহণ করেন? (passage gives *৬ জুন ১৯১৫*)
@@ -722,11 +728,93 @@ The write path was tested on a **copy** of the data, never the real files:
 
 ### 14.5 What is left in this step
 
-1. **Adjudicate** the 253 rows in `adjudication.csv`.
-2. **Run the merge** for real, then rerun the audit.
-3. **Decide about the 2,503 unsampled train rows**: leave their *type* `unlabeled` (their *labels*
-   are fine, §14.3), annotate more, or fill them with LLM-proposed types that are clearly marked
-   `llm_consensus` and never described as human work.
+**Done on 17 September 2026.**
+
+| Item | Result |
+|---|---|
+| Adjudication | all 253 rows decided by hand: **143** given a type, **89** `dispute` (the stored "wrong" answer is actually correct), **21** `skip` (broken item) |
+| Review of the decisions | 3 rows moved from a type to `skip`: `test_0761`, `dev_0285`, `dev_0692` differ from their partner answer only by spelling, and neither answer is in the passage (Rule 12). Original decision kept in the notes |
+| Merge | written into `corpus.jsonl` and all three splits; `D8 MET` (1,867 of 1,977 in-scope wrong answers typed, 110 excluded) |
+| Audit | strict mode: all structural checks pass; metadata probe still **0.534** |
+| Final type counts | has-context: numeric 475 · entity 264 · contradiction 212 · relational 137 — no-context: fabricated 779 |
+
+**What adjudication taught us.** Most disputes were one of two patterns, both already described in
+the guidelines: a *typo-pair* (the "wrong" answer is the correct one with a spelling slip, Rule 12),
+or a *sentence dump* (the "correct" answer is a whole passage sentence and the "wrong" one is the
+exact fact, so both are right, Rule 14). Some pairs had their labels simply swapped — e.g. the
+passage says "তাঁর বাবা ডা. ফখরুল আমিন খান", yet that answer was stored as wrong.
+
+**Decided (17 September 2026): types are needed only where a human looked.**
+
+The requirement D8 originally said *every* wrong answer in the corpus (4,480) needs a type. We
+narrowed it to **test + dev + the 20% train sample (1,977)**. The other 2,503 train wrong answers
+keep `hallucination_type = unlabeled`, marked `type_source = outside_train_sample`, so it is
+visible that this is by design and not forgotten.
+
+Why this is the right call, in plain words:
+
+| Question | Answer |
+|---|---|
+| Do models use the type? | **No.** The type gives away the label (`none` = correct), so it can never be a model input. |
+| Where is the type used? | Only in result tables that say "the model misses *numeric* errors more than *entity* errors". Those tables are computed on **dev and test**, which are fully typed. |
+| Are the train *labels* affected? | **No.** This is only about the type. The train labels were checked on a 20% sample and have 4.5% confirmed noise — under our pre-set 5% limit. |
+| What would typing the rest cost? | About 2,500 more annotations that would not change a single reported number. |
+
+Full wording of the decision: [PRD §5.1c](PRD.md).
+
+### 14.6 Leaving out pairs whose labels cannot be trusted
+
+**What.** Human review found **180 pairs** where the stored labels are confirmed wrong or the item
+is broken. These pairs are left out of **both training and scoring**.
+
+| Why a pair is left out | train | dev | test |
+|---|---:|---:|---:|
+| the "wrong" answer is actually correct (adjudicator: `dispute`) | 28 | 19 | 42 |
+| the "correct" answer was judged wrong by every annotator who saw it | 28 | 34 | 17 |
+| the item is broken (adjudicator: `skip`) | 8 | 5 | 8 |
+| **pairs left out** (a pair can have two reasons) | **62** | **54** | **64** |
+
+**Why.**
+
+- **Scoring:** if a model says "correct" to an answer that really is correct, but the stored label
+  says "wrong", the model loses a point for being right. The score would then measure the dataset's
+  mistakes, not the model.
+- **Training:** the model would be taught the mistake.
+
+**Why it is fair, not cherry-picking.**
+
+1. The rule uses only **human** judgements, made before any model existed.
+2. It was decided **before any model was trained or scored**, so it cannot have been chosen to
+   make a result look better.
+3. A **whole pair** is removed, never half of one, so every split stays exactly 50/50.
+4. Nothing is deleted. The records stay in the files, marked `excluded = true` with a reason, so
+   anyone can check or reverse the decision.
+
+**How it is applied.** One small loader, [`src/splits.py`](../src/splits.py), is the only way
+training and evaluation scripts read data, and it drops excluded pairs automatically:
+
+```python
+from splits import load_split
+train = load_split("train")      # excluded pairs already removed
+```
+
+**What it changed.**
+
+- **The gate still passes on the data models actually use:** metadata probe 0.514 (all records:
+  0.534).
+- **The string-matcher reference numbers were re-measured on the usable data:** 0.823 all · 0.987
+  easy · 0.454 hard (§9.3).
+
+**The dataset we will work with:**
+
+| Split | Pairs | Records | has-context / no-context pairs | Hard has-context pairs |
+|---|---:|---:|---|---:|
+| **train** | **3,067** | **6,134** | 1,834 / 1,233 | 619 |
+| **dev** | **619** | **1,238** | 353 / 266 | 109 |
+| **test** | **614** | **1,228** | 359 / 255 | 119 |
+| **total** | **4,300** | **8,600** | 2,546 / 1,754 | 847 |
+
+Every split is still exactly 50% correct / 50% hallucinated.
 
 ---
 
@@ -747,7 +835,8 @@ Each step was compared with what [PRD.md](PRD.md) and
 | 7 Audit gate | V1 metadata probe < 0.60 | 0.534 | ✅ |
 | 8 Pilot | D5 κ ≥ 0.60; R4 guidelines first | 0.717; guidelines predate annotation | ✅ |
 | 9 Annotation | D4 test 100% double-annotated | 1,356 × 2, κ 0.865, 0 validation errors | ✅ (adjudication pending) |
-| 10 Merge | D8 type for every wrong answer | tool verified; 38.5% settled; not yet written | 🔶 in progress |
+| 10 Merge | D8 type for every wrong answer in test + dev + train sample (narrowed, §14.5) | 253 adjudicated; merged; 1,867 of 1,977 typed, 110 excluded; strict audit passes | ✅ |
+| 10b Exclusion | Q5: flagged pairs out of training and scoring | 180 pairs marked `excluded`; loader filters them; gate 0.514 on usable data | ✅ |
 
 ### 15.1 Problems found and fixed on 17 September 2026
 
@@ -802,7 +891,7 @@ Each step was compared with what [PRD.md](PRD.md) and
 | Probe train/test split | 80 / 20, grouped by pair | same leakage protection as the real splits |
 | κ gate | **≥ 0.60** | "substantial" agreement; below it the guidelines need work |
 | Leakage alarm | any macro-F1 **> 0.95** | too good to be true on this task |
-| Label-noise rule for train | verify more if **> 5%** | measured: 3.3% |
+| Label-noise rule for train | verify more if **> 5%** | measured: 4.5% after adjudication |
 
 ### 16.3 Annotation
 
@@ -833,8 +922,8 @@ Each step was compared with what [PRD.md](PRD.md) and
 ## 17. Questions a teacher is likely to ask
 
 **"Your has-context score is 0.82. Isn't that good?"**
-No. A string matcher with no learning gets 0.812. That is why we report the **hard subset**
-(string matcher 0.456) next to every has-context number, and why our target is 0.80 *on the hard
+No. A string matcher with no learning gets 0.823 on our usable data. That is why we report the
+**hard subset** (string matcher 0.454) next to every has-context number, and why our target is 0.80 *on the hard
 subset*.
 
 **"Why is the test set used only once?"**
@@ -849,7 +938,7 @@ splits.
 
 **"The data was built with LLM help. Isn't that circular?"**
 It is a real concern, which is why (a) humans independently checked all of test and dev and a 20%
-sample of train, (b) we report how often humans disagree with the stored labels (3.3% in the
+sample of train, (b) we report how often humans confirm a stored label is wrong (4.5% in the
 samples), and (c) we never let an LLM write labels.
 
 **"Why keep law and science if they are so hard?"**
@@ -869,6 +958,13 @@ Because changing the target from a spreadsheet would silently change the exam. D
 (222, of which 116 unanimous) and reported as a finding; any fix happens at the source followed by
 a rebuild and a fresh audit.
 
+**"Why don't all training records have a hallucination type?"**
+The type is only used to break down results ("which kind of error does the model miss?"), and
+those breakdowns are done on dev and test, which are fully typed. Models never see the type — it
+would reveal the answer. So typing the remaining 2,503 train records would cost ~2,500
+annotations and change no reported number. Their correct/wrong *labels* are still there and were
+checked on a 20% sample (4.5% confirmed noise). This scope decision is written down in PRD §5.1c.
+
 **"What does the metadata probe prove?"**
 That answer length, digits and punctuation cannot predict correctness (0.534, close to a coin
 flip). A model that scores well must be using the content.
@@ -883,8 +979,7 @@ the search step, and the closed-book condition would stop being closed-book.
 
 In the order they will happen:
 
-1. **Finish step 10:** adjudicate 253 rows → run the merge → rerun the audit.
-2. **Step 11 — the model ladder** (milestones M4–M5), each model on 3 seeds, scored on dev:
+1. **Step 11 — the model ladder** (milestones M4–M5), each model on 3 seeds, scored on dev:
    - **N-gram** (word + character pieces) with Logistic Regression and SVM — the simplest baseline.
    - **Skip-gram / word2vec** word embeddings with Logistic Regression and XGBoost.
    - **BiRNN, BiLSTM, BiLSTM + attention** — neural networks that read text in order.
