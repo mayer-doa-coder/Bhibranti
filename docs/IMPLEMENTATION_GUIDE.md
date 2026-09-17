@@ -7,14 +7,14 @@ ladder. Bangla script in, Bangla script out.
 degradation study, span-level annotation, and the paper. Those are Phase 2. See
 [PRD.md](PRD.md) section 3.2.
 
-**Version:** 2.0 -- rewritten when the project moved from Banglish-first to Bengali-first.
-**Last verified:** 23 August 2026
+**Version:** 2.1 -- model ladder extended to cover the NLP lab syllabus (PRD §5.3, §5.3b).
+**Last verified:** 17 September 2026
 
 ---
 
 ## 0. What "success" means in Phase 1
 
-You are done when all six hold:
+You are done when all of these hold:
 
 | # | Criterion | Target |
 |---|---|---|
@@ -25,6 +25,7 @@ You are done when all six hold:
 | C5 | Every has-context number reported with its string baseline | 0.823 all / 0.454 hard (usable data) |
 | C6 | Full experiment log exists | every run recorded with seed + config |
 | C7 | **No RAG anywhere** | no retrieval at inference; see section 7.0 |
+| C8 | **The NLP lab syllabus is covered** | every "used" topic in PRD §5.3b run and logged; Appendix B maps lab code to project code |
 
 **C4 is not optional.** A high score that fails C4 means the model learned an artifact, not
 hallucination detection. **C5 is the one people forget:** a string matcher scores 0.823 on
@@ -48,6 +49,9 @@ pip install -q torch torchtext
 pip install -q sentencepiece protobuf
 pip install -q krippendorff        # IAA
 pip install -q sacremoses regex
+pip install -q xgboost             # M2 Skip-gram + XGBoost
+pip install -q rapidfuzz           # M12 fast Levenshtein (checked against the Lab 1 DP)
+pip install -q statsmodels         # McNemar's test
 
 # BanglaBERT / BanglishBERT normalisation pipeline (REQUIRED for those models)
 pip install -q git+https://github.com/csebuetnlp/normalizer
@@ -55,25 +59,39 @@ pip install -q git+https://github.com/csebuetnlp/normalizer
 
 ### 1.3 Repository layout
 
+`✅` exists today · `⬜` planned for M4–M6.
+
 ```
-banglishhallu/
+Bhibranti/
+├── NLP Lab/                        # course lab guides + notebooks (Labs 1-5) - read-only syllabus
+├── configs/
+│   ├── schema.json                 ✅ frozen record schema
+│   ├── bn_stopwords.txt            ⬜ M10 stop-word list, negation words removed (§6)
+│   └── bn_suffixes.txt             ⬜ M10 stemmer suffix list (§6)
 ├── data/
-│   ├── raw/                 # scraped / sourced QA pairs
-│   ├── generated/           # LLM-generated candidate answers
-│   ├── annotated/           # post-human-annotation
-│   └── splits/              # train.jsonl / dev.jsonl / test.jsonl
+│   ├── raw/bn_qa_pool/             ✅ 14 source files, verbatim
+│   ├── interim/bn_pool.jsonl       ✅ cleaned pool
+│   ├── corpus/bn_v1/corpus.jsonl   ✅ the corpus
+│   ├── splits/                     ✅ train / dev / test - load via src/splits.py
+│   └── annotated/                  ✅ agreement_test_v1/, round1/
 ├── src/
-│   ├── generate.py          # Step 4
-│   ├── audit.py             # Step 9 — shortcut detection
-│   ├── preprocess.py        # Step 6
-│   ├── train_classical.py   # Step 7
-│   ├── train_transformer.py # Step 7
-│   ├── further_pretrain.py  # Step 8
-│   └── evaluate.py
+│   ├── build_bn_pool.py  build_corpus.py  build_agreement_test.py        ✅ data pipeline
+│   ├── build_annotation_sheets.py  validate_annotation.py                ✅ annotation
+│   ├── score_agreement.py  score_test_agreement.py  merge_annotation.py  ✅ kappa + merge
+│   ├── audit.py                    ✅ shortcut gate
+│   ├── splits.py                   ✅ load_split() - the only data loader
+│   ├── text_bn.py                  ⬜ M10 cleaning, tokenizer, stop words, stemmer (Lab 1)
+│   ├── features.py                 ⬜ M11 n-gram LM, M12 edit distance + cosine (Labs 1-3)
+│   ├── preprocess.py               ⬜ input formats F1/F2/F3
+│   ├── train_classical.py          ⬜ M1, M2, M11, M12 (Labs 2-3)
+│   ├── train_neural.py             ⬜ M3 recurrent, M13 Transformer from scratch (Labs 4-5)
+│   ├── train_transformer.py        ⬜ M4/M5 pretrained encoders
+│   ├── further_pretrain.py         ⬜ M6
+│   └── evaluate.py                 ⬜ metrics, breakdowns, M14 word-order test, McNemar, bootstrap
 ├── notebooks/
 ├── results/
-│   └── experiment_log.csv   # THE single source of truth
-└── configs/
+│   └── experiment_log.csv          ✅ THE single source of truth
+└── docs/
 ```
 
 Create `results/experiment_log.csv` on day one with this header and append **every** run, including failures:
@@ -162,7 +180,7 @@ data/raw/bn_qa_pool/              14 source .jsonl, verbatim, 62,084 records
 data/interim/bn_pool.jsonl        56,480 records (the unfiltered pool)
   |  src/build_corpus.py          pairing + validity filters + splits
 data/corpus/bn_v1/corpus.jsonl    4,480 pairs / 8,960 records
-data/splits/{train,dev,test}      3,129 / 673 / 678 pairs
+data/splits/{train,dev,test}      3,129 / 673 / 678 pairs  (usable after §3.4: 3,067 / 619 / 614)
   |  src/merge_annotation.py      human annotation (data/annotated/round1/) -> types
 ```
 
@@ -344,8 +362,79 @@ Phase 1 is Bengali script throughout, so there are **no transliteration arms**. 
 raw / back-transliterated / dual three-arm design belongs to Phase 2, where the input is Banglish
 and converting it to Bengali script is a genuine modelling choice. Here it would be a no-op.
 
-What Phase 1 does have is normalisation and input format -- and format usually matters more than
-architecture.
+What Phase 1 does have is cleaning, tokenization, normalisation and input format -- and format
+usually matters more than architecture. The first four subsections are **Lab 1** adapted to
+Bengali (PRD §5.3c); they feed every model that is not a pretrained encoder (M1–M3, M11–M14).
+
+> **Never copy Lab 1's code onto Bengali text.** `re.sub(r'[^A-Za-z\s]', '', text)` deletes every
+> Bengali letter and every digit. NLTK's `word_tokenize`, `stopwords('english')`, `PorterStemmer`
+> and `WordNetLemmatizer` are English-only. The recipes below are the Bengali equivalents.
+
+### Cleaning with regular expressions (Lab 1) -- default for M1–M3, M11–M14
+
+Applied to context, question and answer alike, in this order:
+
+| Step | Pattern | Why |
+|---|---|---|
+| Unicode NFC normalisation | `unicodedata.normalize("NFC", text)` | য় can be stored as one code point (U+09DF) or as য + ় . The corpus uses only the second form today (44,109 times), but a copied stop-word or suffix list may use the first and then silently match nothing. Apply NFC to text **and** to both lists |
+| Remove Wikipedia citation marks | `\[[0-9০-৯]+\]` | about 1 passage in 7 still carries `[1]`, `[2][3]` (guideline Rule 15) |
+| Unify digits | map `০১২৩৪৫৬৭৮৯` → `0123456789` | "১৯৭১" and "1971" become the same feature; the *value* is kept |
+| Collapse whitespace | `\s+` → one space, then strip | 208 passages contain newlines or tabs |
+
+**Never removed:** digits (475 `numeric` errors are in them), Bengali letters, the negation words
+(§6 stop words), punctuation (it becomes its own token instead). Keep zero-width joiners
+(`‌`, `‍`): they are part of Bengali spellings such as র‍্যাট.
+
+### Tokenization (Lab 1) -- default
+
+```python
+TOKEN = re.compile(r"[ঀ-৿‌‍]+|[0-9]+(?:[.,][0-9]+)*|[A-Za-z]+|[^\s]")
+tokens = TOKEN.findall(clean(text))
+```
+
+Bengali letter runs, numbers (with decimals), Latin words, and every other non-space character —
+including the দাঁড়ি `।` — as a separate token. Deterministic and dependency-free, so the same
+tokens reach M1–M3, M11–M14.
+
+### Stop-word removal (Lab 1) -- ablation only (M10)
+
+- List: `configs/bn_stopwords.txt`, copied from a published Bengali list (e.g. the one shipped with
+  `bnlp_toolkit`, MIT) so the exact list is versioned with the project.
+- **Deleted from the list before use:** না, নয়, নি, নেই, নাই, নহে, ছাড়া. A negation flip
+  ("বিভক্ত" → "বিভক্ত নয়") is how 212 `contradiction` errors are made; removing negation makes them
+  invisible.
+- One extra **demonstration** run keeps the negation words *in* the list, and reports the drop on
+  the `contradiction` type. That shows *why* the rule exists instead of just stating it.
+
+### Stemming (Lab 1, Porter-style) -- ablation only (M10)
+
+Porter's algorithm is a sequence of suffix-rewrite steps with a minimum-stem condition. The Bengali
+version keeps that shape:
+
+1. Suffixes in `configs/bn_suffixes.txt`, tried **longest first**, one strip per word — e.g.
+   `গুলোকে গুলোর গুলো দেরকে দের েরা কে রা এর ের তে টি টা খানা`.
+2. Strip only if at least **2 characters** of stem remain (Porter's "measure" condition).
+3. **Never strip a negation ending** (`নি`, `না`): "করেননি" must not become "করেন".
+4. Numbers and Latin tokens are left alone.
+
+Lemmatization is not attempted: it needs a dictionary and part-of-speech tags, and no dependable
+Bengali lemmatizer exists (PRD §5.3b).
+
+### The M10 ablation grid
+
+Run on the best model of M1 (sparse), M2 (Skip-gram) and M3 (BiLSTM), dev only:
+
+| Variant | Clean + tokenize | Stop words (negation kept) | Stemming |
+|---|:-:|:-:|:-:|
+| V0 whitespace split (lower bound) | — | — | — |
+| **V1 default** | ✅ | — | — |
+| V2 | ✅ | ✅ | — |
+| V3 | ✅ | — | ✅ |
+| V4 | ✅ | ✅ | ✅ |
+| V2-demo (negation words removed too) | ✅ | ✅ incl. negation | — |
+
+Skip-gram vectors are retrained for each variant (the vocabulary changes). Report overall, hard
+subset and per-type macro-F1 — the `contradiction` column is the one to watch.
 
 ### Normalisation -- required for BanglaBERT
 
@@ -403,16 +492,171 @@ ladder below may be extended but not replaced.
 ### 7.1 Classical baselines (your syllabus models — the lower bound)
 
 Run these first. They are fast, they give you a working pipeline in an afternoon, and their failure modes are informative.
+The order follows the lab: Lab 2–3 sparse models → Lab 2 n-gram LM → Lab 3 embeddings → Lab 1/3
+similarity features → Lab 4 recurrent → Lab 5 Transformer. All use §6 cleaning and tokenization
+and load data with `load_split()`.
 
-| Model | Config | Also log |
+| ID | Model | Config | Lab | Also log |
+|---|---|---|---|---|
+| M1 | BoW + Naive Bayes | `CountVectorizer`, word 1–2 + char 3–5 grams; `MultinomialNB(alpha=1.0)` (Laplace) | 2, 3 | — |
+| M1 | TF-IDF + Naive Bayes | `TfidfVectorizer`, same n-grams; `MultinomialNB(alpha=1.0)` | 2, 3 | — |
+| M1 | BoW / TF-IDF + LogReg | same features, `LogisticRegression(max_iter=2000)` | 2, 3 | **OOV rate** on dev |
+| M1 | BoW / TF-IDF + SVM | same features, `LinearSVC` | 2 | — |
+| M11 | Char n-gram LM (class-conditional) | §7.1a | 2, 3 | dev perplexity of each LM |
+| M2 | Skip-gram mean + LogReg / XGBoost | gensim Word2Vec `sg=1, vector_size=200, window=5, min_count=2`, trained on **train split text only**; plain mean of word vectors | 3 | **vocab coverage** |
+| M2 | Skip-gram TF-IDF-weighted + LogReg / XGBoost | same vectors, each word weighted by TF × IDF (IDF from train) | 3 | — |
+| M12 | Similarity features + LogReg | §7.1b | 1, 3 | feature coefficients |
+| M3 | Vanilla RNN | 1 layer, hidden 256, one direction, Skip-gram init | 4 | — |
+| M3 | BiRNN | 1 layer, hidden 256, Skip-gram init | 4 | — |
+| M3 | BiLSTM | 2 layers, hidden 256, dropout 0.3, Skip-gram init | 4 | — |
+| M3 | BiLSTM + Attention | + dot-product attention (`torch.bmm`) over hidden states | 4 | attention weights on 20 dev items |
+| M13 | Transformer from scratch | §7.1d | 5 | — |
+
+**How the three parts of a record enter the sparse models (M1).** One vectorizer per part —
+context, question, answer — fitted on train, stacked side by side (`scipy.sparse.hstack`). The
+model can then weigh a word differently when it appears in the answer than when it appears in the
+passage. For no-context records the context block is all zeros. What a bag of words *cannot* see
+is whether the answer matches the passage; that is what M11a and M12 add.
+
+**Sklearn/gensim instead of the lab's from-scratch code.** Lab 3 writes Naive Bayes, Logistic
+Regression and Skip-gram by hand. The project uses the library versions for speed, but checks them
+once: on a 200-record sample, the lab implementation and the library must predict the same labels
+(Naive Bayes, LR) — record the agreement in the log. The pieces the libraries do not provide are
+written by hand, as in the lab: the Levenshtein DP (Lab 1), the n-gram LM (Lab 2), attention
+(Lab 4), positional encoding (Lab 5).
+
+### 7.1a M11 — Character n-gram language model (Lab 2)
+
+The lab's `build_ngram_model` (chain rule, Markov assumption, MLE counts), at **character**
+level — answers have a median length of 16 characters, far too short for word n-grams — and with
+**Laplace smoothing** from Lab 3, because MLE gives probability 0 to any unseen n-gram.
+
+```
+P(c_i | c_{i-n+1..i-1}) = (C(history, c_i) + 1) / (C(history) + |V|)
+score(text, LM) = (1 / len(text)) * Σ log P(c_i | history)      # length-normalised
+```
+
+Sentence boundaries use `<s>` padding as in the lab's toy example. `n` is chosen from {2, 3, 4}
+on dev (default 3).
+
+| Use | How | Output |
 |---|---|---|
-| N-gram + LogReg | TF-IDF, word 1–2 grams + char 3–5 grams | **OOV rate** on test |
-| N-gram + SVM | Same features, LinearSVC | — |
-| Skip-gram + LogReg | gensim Word2Vec sg=1, dim=200, window=5, min_count=2, averaged | **vocab coverage** |
-| Skip-gram + XGBoost | Same embeddings | — |
-| BiRNN | 1 layer, hidden 256, Skip-gram init | — |
-| BiLSTM | 2 layers, hidden 256, dropout 0.3, Skip-gram init | — |
-| BiLSTM + Attention | + additive attention over hidden states | — |
+| **(a) Passage-conditioned score** (has-context) | build an LM from **this record's own passage**; score the answer | a number: "how passage-like is this answer?" — a soft version of the string matcher that survives one-character changes. Used as an M12 feature and as a threshold rule (threshold chosen on train) |
+| **(b) Class-conditional classifier** (both conditions) | LM₁ from train correct answers, LM₀ from train wrong answers (usable records only); predict `1` if `score(answer, LM₁) > score(answer, LM₀)` | a label. This sees **only the answer**, so report it next to the V3 answer-only probe (0.540). Far above it means it learned the answer generator's style |
+
+(a) uses only the record's own passage, so it is not retrieval (PRD §5.3a). (b) is a trained model,
+like Naive Bayes.
+
+### 7.1b M12 — Similarity features and the fuzzy baseline (Labs 1 and 3)
+
+Every feature compares a record with **itself** — never with other records (PRD §5.3a).
+
+| Feature | Definition | Lab |
+|---|---|---|
+| `exact_in_passage` | 1 if the cleaned answer is a substring of the cleaned passage (the string matcher) | 2 |
+| `edit_passage` | smallest **normalised Levenshtein distance** between the answer and any passage window of the answer's length ±2 characters (0 = found exactly, 1 = nothing alike) | 1 |
+| `edit_question` | normalised Levenshtein distance between answer and question | 1 |
+| `token_overlap` | share of answer tokens that occur in the passage | 2 |
+| `cos_passage`, `cos_question` | cosine similarity between the mean Skip-gram vector of the answer and of the passage / question | 3 |
+| `lm_passage` | M11 (a) score | 2 |
+| `has_context` | 1 / 0; passage features are 0 when there is no passage | — |
+| `answer_len`, `digit_share` | length in characters, share of digits | — |
+
+Normalised distance = Levenshtein / max(len(a), len(b)). Implement the DP exactly as Lab 1's
+`calculate_edit_distance`; for speed over long passages use `rapidfuzz.distance.Levenshtein`, after
+checking on 500 random pairs that both give identical distances.
+
+Model: standardise the features, then `LogisticRegression`. Deterministic, so one run. Report the
+coefficients — they say which kind of similarity the decision rests on.
+
+**V6 — fuzzy string-matcher baseline.** Predict `1` if `edit_passage ≤ τ`, with τ chosen on the
+train split (usable has-context records) to maximise macro-F1, then report it on dev beside the
+exact matcher (0.823 all / 0.454 hard on the usable data). A learned model that beats 0.454 but
+not this rule has learned fuzzy string matching, not grounding.
+
+**Offline sanity check of the Skip-gram vectors (Lab 3).** Before using them, print the 5
+nearest words by cosine similarity for ~10 common words (e.g. নদী, রাজা, সাল, বিজ্ঞান). If the
+neighbours are unrelated, the vectors are too weak to trust. This is a check on the vectors, run
+once offline — never a lookup at prediction time.
+
+### 7.1c M3 — Recurrent models in PyTorch (Lab 4)
+
+**Vocabulary and embeddings** (Lab 4, Topic 0):
+
+- Tokens from §6, vocabulary from the **train** split, `min_count = 2`.
+- Reserved ids: `<PAD>` = 0, `<UNK>` = 1, `<SEP>` = 2.
+- Embedding matrix: Skip-gram vector (M2, dim 200) for known words, `N(0, 0.1)` for words without
+  one, zeros for `<PAD>`. Load with
+  `nn.Embedding.from_pretrained(matrix, freeze=False, padding_idx=0)`.
+
+**Input:** `context <SEP> question <SEP> answer` (F2 order), max 256 tokens. If too long, cut
+the **context** from its end — never the question or the answer. No-context: `question <SEP>
+answer`.
+
+**Padding — fix a lab shortcut.** Lab 4 reads the RNN's final state `h_n` after the padding, so a
+short input's state has been run through many `<PAD>` steps. Here, pack the batch:
+`pack_padded_sequence(emb, lengths, batch_first=True, enforce_sorted=False)`, so `h_n` is the state
+at each sequence's true last token.
+
+**Classifier head:** final hidden state (forward ⊕ backward of the top layer for bidirectional
+models) → dropout 0.3 → `Linear(→ 1)`. Loss `BCEWithLogitsLoss`; `torch.sigmoid(logit)` =
+**P(correct)**, matching the project's `1 = correct` convention.
+
+**Dot-product attention (Lab 4 `torch.bmm`):**
+
+```python
+q = self.query(h_final).unsqueeze(1)                          # (B, 1, H)
+scores = torch.bmm(q, outputs.transpose(1, 2)) / H ** 0.5     # (B, 1, T)
+scores = scores.masked_fill(pad_mask.unsqueeze(1), -1e9)      # ignore <PAD>
+weights = torch.softmax(scores, dim=-1)                       # (B, 1, T)
+context = torch.bmm(weights, outputs).squeeze(1)              # (B, H)
+logit = self.fc(torch.cat([context, h_final], dim=1))
+```
+
+Save `weights` for 20 dev items (10 correct, 10 hallucinated, half hard) and show which passage
+words received the most weight. It is the only rung below the pretrained encoders that can say
+*where* it looked.
+
+**Training loop** (Lab 4 pattern, written out — not the Hugging Face `Trainer`):
+`optimizer.zero_grad()` → forward → loss → `loss.backward()` →
+`clip_grad_norm_(params, 1.0)` → `optimizer.step()`.
+
+| Setting | Value |
+|---|---|
+| Optimizer | Adam, lr 1e-3 |
+| Batch | 32, shuffled with the run's seed |
+| Epochs | up to 20, early stopping on dev loss (patience 3), keep the best checkpoint |
+| Seeds | 42, 1337, 2024 (`torch.manual_seed`, `numpy`, `random`, and the DataLoader generator) |
+
+### 7.1d M13 — Transformer encoder from scratch (Lab 5)
+
+Lab 5's `TransformerClassifier`, on the real task. It has the **same kind of architecture** as
+BanglaBERT but **no pretraining**, so the gap between M13 and M4/M5 measures what pretraining is
+worth on this data.
+
+| Part | Setting |
+|---|---|
+| Vocabulary, input, truncation | same as M3 (§7.1c), so only the architecture differs |
+| Embedding | `nn.Embedding(V, 128, padding_idx=0)`, random init (Lab 5), scaled by √d_model |
+| Positional encoding | fixed sine/cosine, `register_buffer` (Lab 5 Block 4) |
+| Encoder | `nn.TransformerEncoderLayer(d_model=128, nhead=4, dim_feedforward=256, dropout=0.1, batch_first=True)` × 2 layers |
+| Padding mask | `src_key_padding_mask = (input_ids == 0)` |
+| Pooling | **masked** mean over real tokens only (see below) |
+| Head | `Linear(128 → 1)`, `BCEWithLogitsLoss`, sigmoid = P(correct) |
+| Optimizer | Adam, lr 5e-4, linear warm-up over the first 10% of steps |
+| Training | batch 32, up to 30 epochs, early stopping on dev loss (patience 3), 3 seeds |
+
+**Fix a lab shortcut.** Lab 5 pools with `encoded.mean(dim=1)`, which averages the `<PAD>`
+positions in too; fine for its fixed-length toy sentences, wrong for passages of very different
+lengths. Use:
+
+```python
+keep = (~pad_mask).unsqueeze(-1).float()                      # (B, T, 1)
+pooled = (encoded * keep).sum(1) / keep.sum(1).clamp(min=1)
+```
+
+A from-scratch Transformer on ~6K records is expected to land near the classical models, well below
+the pretrained encoders. **That gap is the result**, not a failure to tune away.
 
 Char n-grams matter a lot here — Bangla is heavily inflected and compounds freely, so word-level features fragment across surface forms of the same root. Character features partially recover that. They also catch the near-miss wrong answers (পুনর্মিলন vs পুনঃমিলন), which differ by a character or two.
 
@@ -453,6 +697,9 @@ Expect 0.50–0.65 macro-F1 at 4K training examples. That is the correct result,
 Note how tight that spread is — 2.8 points across seven very different models. **Do not expect architecture choice alone to transform your score.** Input format and further pretraining will move the needle more. Report ties as ties (McNemar), and expect BanglaBERT to rank higher on Bengali script than it did on that transliterated task.
 
 ### 7.3 Fine-tuning hyperparameters
+
+These are for the **pretrained** encoders (M4–M6). The recurrent models and the from-scratch
+Transformer train from much less prior knowledge and use their own settings (§7.1c, §7.1d).
 
 Start from BanTH's published setup — it is a validated recipe on closely related data:
 
@@ -614,6 +861,7 @@ If it fails, inspect `clf.coef_` to find the leaking feature, fix the generation
 ### 9.2 The three other checks
 
 **Answer-only probe.** Train a full BERT on `candidate_answer` alone, no question, no context. On the has-context split this should be substantially worse than the full-input model. If it isn't, the answer text alone gives away the label — meaning the model isn't checking grounding at all.
+The M11 (b) class-conditional LM is also answer-only; report it in the same table as this probe.
 
 **Human-written holdout.** Keep 100–200 test items whose hallucinated answers were written by humans, not generated. If model performance collapses on this slice, your model learned the generator's fingerprint. This is the most honest test you can run, and it becomes a headline result in Phase 2.
 
@@ -666,18 +914,24 @@ The BanTH defaults are fine. Don't spend a week here.
 
 Not a competitor — a **ceiling marker** and reviewer insurance. One afternoon.
 
-Run GPT-4-class, Gemini, and/or Llama zero-shot and few-shot on 300–500 test items. Report as one block in your results table.
+Run GPT-4-class, Gemini, and/or Llama zero-shot and few-shot on 300–500 items. Develop and compare
+prompts on **dev**; score test only inside the single M6 evaluation. Report as one block in your
+results table.
 
-**Prompting strategies worth testing** (all validated on transliterated Bangla in BanTH):
+**No retrieval in the prompt (PRD §5.3a).** A prompt contains the record's own question, passage
+(has-context only) and answer, plus fixed instructions. Few-shot examples are **one fixed set**
+(e.g. 4 train records: 2 correct, 2 hallucinated, drawn once with seed 42) used unchanged for every
+item. Choosing examples per item by similarity is retrieval and is forbidden. The model must not be
+given a browsing or search tool.
+
+**Prompting strategies worth testing:**
 
 | Strategy | Addition to base prompt |
 |---|---|
 | Non-explanatory | Base only |
 | CoT | + "Let's think step by step" |
 | Explanation | + "Explain why" |
-| **Translation-based** | Prepend: *"Translate the following transliterated text into standard Bangla/English"* then classify |
-
-The translation-based strategy was BanTH's own contribution and it topped their zero-shot results. It is directly applicable to your task and costs nothing to try.
+| ~~Translation-based~~ | **Phase 2 only.** BanTH prepends "translate the transliterated text into standard Bangla"; Phase 1 input is already Bengali script, so there is nothing to translate |
 
 **What to expect:** on BanTH, fine-tuned encoders beat every prompting result by roughly 8 points. Your fine-tuned models should win. If a zero-shot LLM beats your fine-tuned encoder by a wide margin, that's a signal your training data is too small or too noisy.
 
@@ -697,6 +951,28 @@ Report **separately** for:
 - per hallucination type — **dev and test only**; filter out `hallucination_type == "unlabeled"`
   (adjudicator skip/dispute) and say so in the table caption
 - human-written holdout vs. generated
+
+Every has-context row shows **both** string baselines on the same records: exact matcher and fuzzy
+matcher (V6).
+
+### 12.1a M14 — Word-order diagnostic (Lab 3's "the dog bit the man")
+
+Lab 3 proves that any bag-of-words model gives "the dog bit the man" and "the man bit the dog"
+the same vector. M14 measures what that costs here. **Dev only.**
+
+1. Take each trained model's dev predictions as usual.
+2. Shuffle the token order inside each part (context, question, answer separately) with seed 42,
+   and predict again with the same model. For pretrained encoders, shuffle the words before
+   their tokenizer runs.
+3. Report Δ macro-F1 = shuffled − normal: overall, has-context, hard subset, and per type.
+
+| Expected | Meaning |
+|---|---|
+| Δ = 0 exactly for M1 BoW/TF-IDF, M2 mean/weighted | by construction — **if not zero, there is a bug** |
+| Δ < 0 for M3, M13, M4 | the model uses word order |
+| Largest drop on `relational` and `contradiction` | those errors *are* changes of order or negation |
+
+A sequence model with Δ ≈ 0 is not using the order it was built to use; that is a finding.
 
 ### 12.2 Statistical rigour
 
@@ -719,7 +995,10 @@ Without this, you cannot claim model A beats model B when they differ by 1.5 poi
 | Has-context (intrinsic) | **0.80 – 0.90** | > 0.95 → audit for leakage |
 | No-context (extrinsic) | **0.60 – 0.75** | > 0.85 → audit |
 | Hard subset only | **0.55 – 0.70** | — |
-| Classical models @ 4K | 0.50 – 0.65 | Expected |
+| Classical models @ 4K (M1, M2, M11) | 0.50 – 0.65 | Expected |
+| Similarity features + LogReg (M12), has-context | near the fuzzy matcher (V6) | far above V6 → check for leakage |
+| Recurrent models (M3) | 0.55 – 0.70 | — |
+| Transformer from scratch (M13) | near M3, well below pretrained encoders | above pretrained → audit |
 | Zero-shot LLM | 0.60 – 0.72 | — |
 
 **External anchors:**
@@ -732,32 +1011,55 @@ The no-context number will be much lower than has-context. **That is correct, no
 
 ### 12.4 Required results tables
 
-**Table 1 — Main results**
+**Table 1 — Main results** (rows follow the lab order)
 
-| Model | Has-context F1 | No-context F1 | Overall F1 | Acc |
-|---|---|---|---|---|
-| *Classical* | | | | |
-| N-gram + LogReg | | | | |
-| Skip-gram + LogReg | | | | |
-| BiLSTM | | | | |
-| *Pretrained encoders* | | | | |
-| mBERT | | | | |
-| XLM-R | | | | |
-| MuRIL | | | | |
-| BanglaBERT | | | | |
-| IndicBERT v2 | | | | |
-| *Further pretrained* | | | | |
-| FPT-mBERT (ours) | | | | |
-| FPT-XLM-R (ours) | | | | |
-| *Ensemble* | | | | |
-| Soft-vote top-3 | | | | |
-| *LLM reference* | | | | |
-| GPT zero-shot | | | | |
+| Model | Lab | Has-ctx F1 | Has-ctx **hard** F1 | No-ctx F1 | Overall F1 | Acc |
+|---|---|---|---|---|---|---|
+| *Reference rules* | | | | | | |
+| Majority class | — | | | | | |
+| Exact string matcher | 2 | | | — | | |
+| Fuzzy string matcher (V6) | 1 | | | — | | |
+| Passage n-gram LM rule (M11a) | 2 | | | — | | |
+| *Sparse (M1)* | | | | | | |
+| BoW + Naive Bayes | 2, 3 | | | | | |
+| TF-IDF + Naive Bayes | 2, 3 | | | | | |
+| TF-IDF + LogReg | 2, 3 | | | | | |
+| TF-IDF + SVM | 2 | | | | | |
+| *N-gram LM (M11)* | | | | | | |
+| Class-conditional char LM (answer-only) | 2, 3 | | | | | |
+| *Embeddings (M2)* | | | | | | |
+| Skip-gram mean + LogReg | 3 | | | | | |
+| Skip-gram TF-IDF-weighted + LogReg | 3 | | | | | |
+| Skip-gram + XGBoost (best aggregation) | 3 | | | | | |
+| *Similarity features (M12)* | | | | | | |
+| Edit distance + cosine + LM + LogReg | 1, 2, 3 | | | | | |
+| *Recurrent (M3)* | | | | | | |
+| Vanilla RNN | 4 | | | | | |
+| BiRNN | 4 | | | | | |
+| BiLSTM | 4 | | | | | |
+| BiLSTM + attention | 4 | | | | | |
+| *Transformer from scratch (M13)* | 5 | | | | | |
+| *Pretrained encoders (M4/M5)* | | | | | | |
+| mBERT | — | | | | | |
+| XLM-R | — | | | | | |
+| MuRIL | — | | | | | |
+| BanglaBERT | — | | | | | |
+| IndicBERT v2 | — | | | | | |
+| *Further pretrained (M6)* | | | | | | |
+| FPT-mBERT (ours) | — | | | | | |
+| FPT-XLM-R (ours) | — | | | | | |
+| *Ensemble (M7)* | | | | | | |
+| Soft-vote top-3 | — | | | | | |
+| *LLM reference (M8)* | | | | | | |
+| GPT zero-shot | — | | | | | |
 
 **Table 2 — Difficulty breakdown** (easy/hard × model)
-**Table 3 — Per-hallucination-type F1**
+**Table 3 — Per-hallucination-type F1** (dev/test only)
 **Table 4 — Normalisation × input format ablation**
-**Table 5 — Shortcut audit results**
+**Table 5 — Shortcut audit results** (metadata probe, answer-only probe incl. M11b, exact and fuzzy matchers)
+**Table 6 — Preprocessing ablation (M10)** — variants V0–V4 and V2-demo × best M1 / M2 / M3 model; overall, hard, `contradiction` F1
+**Table 7 — Word-order diagnostic (M14)** — Δ macro-F1 after shuffling, per model; overall, has-context, hard, `relational`, `contradiction`
+**Table 8 — Per-subject F1** — every subject × best model per rung (law, science, BCS and literature are the ones to watch)
 
 ---
 
@@ -768,9 +1070,9 @@ The no-context number will be much lower than has-context. **That is correct, no
 | **1** | Licence audit, source selection, schema frozen, 500-item pilot generated, **shortcut probe run on pilot** |
 | **2** | Annotation guidelines written, 100-item annotation pilot, κ computed, guidelines revised |
 | **3** | Full generation (4,000 items), full annotation, splits created, IAA reported |
-| **4** | Classical baselines + first transformer run; pipeline end-to-end |
-| **5** | Full model ladder × 3 preprocessing arms × 3 input formats; 5-fold CV |
-| **6** | Further pretraining; ensemble; threshold tuning; LLM reference; final audit; results tables |
+| **4** | Lab 1–3 rungs: text_bn.py (M10 default), M1, M11, M2, M12, V6 baseline; evaluate.py; M10 ablation grid |
+| **5** | Lab 4–5 rungs: M3 recurrent models, M13 Transformer from scratch; first pretrained encoders (M4/M5); input formats (M9) |
+| **6** | Further pretraining; ensemble; threshold tuning; LLM reference; M14 word-order diagnostic; final audit; Tables 1–8 |
 
 Six weeks part-time. Weeks 1–3 are the ones people underestimate — data work always takes longer than modelling.
 
@@ -822,16 +1124,43 @@ Six weeks part-time. Weeks 1–3 are the ones people underestimate — data work
 
 ---
 
-## Appendix A — Day-one checklist
+## Appendix B — From the NLP lab to this project
 
-- [ ] Repo created with the Section 1.3 layout
-- [ ] `results/experiment_log.csv` created with headers
-- [ ] `data/SOURCES.md` created; licence recorded for every source
-- [ ] Kaggle competition rules/licence read and recorded
-- [ ] Data schema (Section 2) frozen and written to `configs/schema.json`
-- [ ] Label convention confirmed everywhere: **1 = correct, 0 = hallucinated** (Section 2.1)
-- [ ] Generation prompt template drafted with length + register constraints
-- [ ] Annotation guidelines document started
-- [ ] Two annotators recruited and briefed
-- [ ] Seeds fixed: 42, 1337, 2024
-- [ ] Test set designated and **locked** — no looking at it until Week 6
+Where each lab piece ends up. The full list, including the seven excluded topics and why, is PRD
+§5.3b.
+
+| Lab | Lab code / concept | Project | Changed for this project |
+|---|---|---|---|
+| 1 | `re.sub` cleaning | `text_bn.py` clean() — §6 | Bengali-aware patterns; digits and Bengali letters kept; NFC added |
+| 1 | `word_tokenize` | `text_bn.py` tokenize() — §6 | regex tokenizer for Bengali; `।` is its own token |
+| 1 | `stopwords.words('english')` | `configs/bn_stopwords.txt` — M10 ablation | Bengali list; negation words removed from it |
+| 1 | `PorterStemmer` | `text_bn.py` stem() — M10 ablation | Bengali suffix rules; never strips negation |
+| 1 | `calculate_edit_distance` (DP) | `features.py` — M12, V6 | normalised; best window over the passage |
+| 2 | `CountVectorizer`, `TfidfVectorizer` | `train_classical.py` — M1 | word + char n-grams, one block per record part |
+| 2 | `build_ngram_model` (MLE) | `features.py` — M11 | character level; Laplace smoothing; scores instead of generating |
+| 3 | Skip-gram from scratch | gensim Word2Vec — M2 | trained on the train split; checked with nearest neighbours |
+| 3 | `calculate_cosine_similarity` | `features.py` — M12 | answer vs its own passage / question only |
+| 3 | `train_naive_bayes` | `MultinomialNB(alpha=1)` — M1 | checked against the lab code on a sample |
+| 3 | `train_logistic_regression` | `LogisticRegression` — M1, M2, M12 | checked against the lab code on a sample |
+| 3 | `get_document_embedding`, `get_tfidf_embedding` | M2 | unchanged idea |
+| 3 | "dog bit the man" test | `evaluate.py` — M14 | run on every trained model, reported per type |
+| 4 | `nn.Embedding.from_pretrained`, PAD/UNK | `train_neural.py` — M3 | Bengali Skip-gram vectors; `<SEP>` added |
+| 4 | `VanillaRNNClassifier`, `StackedBiLSTMClassifier` | M3 | packed sequences, so padding does not blur the final state |
+| 4 | `torch.bmm` attention | M3 | padding masked; weights inspected |
+| 4 | `BCEWithLogitsLoss` | M3, M13 | sigmoid = P(correct) |
+| 5 | `PositionalEncoding`, `TransformerClassifier` | `train_neural.py` — M13 | masked mean pooling; context truncated first |
+
+## Appendix A — Day-one checklist (status 17 September 2026)
+
+- [x] Repo created (current layout: §1.3)
+- [x] `results/experiment_log.csv` created with headers
+- [x] `data/SOURCES.md` created — ⚠ two licence questions still open (PRD Q1–Q3)
+- [ ] Kaggle competition rules/licence read and recorded — open (PRD Q1)
+- [x] Data schema (Section 2) frozen and written to `configs/schema.json`
+- [x] Label convention confirmed everywhere: **1 = correct, 0 = hallucinated** (Section 2.1)
+- [—] Generation prompt template — not applicable: Phase 1 generates no data (§4). The prompts that
+  built the source pool are unrecorded (PRD Q4)
+- [x] Annotation guidelines written before annotation (15 rules)
+- [x] Two annotators recruited, briefed, and finished (κ 0.717 pilot, 0.865 test)
+- [x] Seeds fixed: 42, 1337, 2024
+- [x] Test set designated and **locked** — opened only at M6

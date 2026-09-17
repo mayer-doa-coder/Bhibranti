@@ -37,6 +37,7 @@ pandas==3.0.1
 # gensim                 # Skip-gram / Word2Vec (guide sec 7.1)
 # xgboost                # Skip-gram + XGBoost baseline
 # statsmodels            # McNemar's test (guide sec 12.2)
+# rapidfuzz              # M12 fast Levenshtein, checked against the Lab 1 DP (guide sec 7.1b)
 # krippendorff           # inter-annotator agreement (guide sec 5.2)
 # sacremoses
 # regex

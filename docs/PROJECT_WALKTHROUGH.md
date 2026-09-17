@@ -6,8 +6,8 @@ seen the code (a teacher, a classmate, or ourselves a month from now) can follow
 
 **Who:** Tawhidul Hasan (2107004) · Md. Saif Ahmed Shejan (2107009)
 **Supervisors:** Dr. K. M. Azharul Hasan · Md. Nazirulhasan Shawon
-**Covers:** the beginning of the project → the current step (merging human annotation into the
-corpus). **Last updated:** 17 September 2026.
+**Covers:** the beginning of the project → the end of the data phase (annotation complete and
+merged), plus the plan for the model ladder built on the NLP lab. **Last updated:** 17 September 2026.
 
 > **Keep this file alive.** Each time a step finishes, add a new section in the same format
 > (What / Why / How / Result / Checked?) and update the status table in §2.
@@ -32,7 +32,7 @@ older notes. Where an older document had a wrong number, §15 says so.
 11. [Step 7 — The shortcut audit](#11-step-7--the-shortcut-audit)
 12. [Step 8 — Annotation guidelines and the 100-item agreement test](#12-step-8--annotation-guidelines-and-the-100-item-agreement-test)
 13. [Step 9 — Full human annotation](#13-step-9--full-human-annotation)
-14. [Step 10 (current) — Merging the annotation into the corpus](#14-step-10-current--merging-the-annotation-into-the-corpus)
+14. [Step 10 — Merging the annotation into the corpus](#14-step-10--merging-the-annotation-into-the-corpus)
 15. [Health check — was each step done correctly?](#15-health-check--was-each-step-done-correctly)
 16. [All the parameters in one place](#16-all-the-parameters-in-one-place)
 17. [Questions a teacher is likely to ask](#17-questions-a-teacher-is-likely-to-ask)
@@ -68,12 +68,32 @@ and decides: **is this answer correct (`1`) or hallucinated (`0`)?**
 **What Phase 1 delivers.**
 
 1. A clean, **human-checked Bengali dataset** (we call it the *corpus*) of 4,480 question–answer
-   pairs.
+   pairs, 4,300 of them usable after human review.
 2. A **ladder of models**, from very simple (word counting) to modern (BERT-style transformers),
-   all tested on that dataset so we can compare them fairly.
+   climbing through the NLP lab syllabus (Labs 1–5), all tested on that dataset so we can compare
+   them fairly.
 3. A **reproducible pipeline**: anyone can rerun our scripts and get byte-for-byte the same data.
 
-So far we have finished (1) up to the final merge. (2) has not started yet.
+**Done so far:** (1) is complete — built, annotated, adjudicated and merged. (3) is in place for the
+data. (2), the models, is next.
+
+**The problem never changed.** From the first day it has been: *given a question, maybe a passage,
+and an answer — is the answer correct or hallucinated, without looking anything up?* Adding the lab
+topics changed **how** we study it (more model types, and tests of *why* each works), not **what**
+we solve.
+
+**What Phase 1 will be able to tell you, with numbers:**
+
+| Question | How we find out |
+|---|---|
+| How accurately can a model spot wrong Bengali answers, with and without a passage? | every model, scored separately for the two cases |
+| Does it really read the passage, or just check if the words appear there? | the hard subset, compared with an exact and a fuzzy string matcher |
+| How far does each lab technique get — word counts, n-gram language models, word vectors, RNNs, a Transformer? | the model ladder, in lab order |
+| How much of the best score comes from **pretraining**? | a Transformer trained from scratch vs BanglaBERT |
+| Do English-style cleaning steps (stop words, stemming) help or hurt in Bengali? | the preprocessing variants |
+| Which models actually use **word order**? | the word-order shuffle test |
+| Which error types and subjects are hardest? | breakdowns by type and subject |
+| Can we trust the labels? | κ = 0.865, 4.5% measured noise, 180 unusable pairs removed |
 
 ---
 
@@ -148,7 +168,7 @@ Two lessons came out of that:
 | **No subject is removed for being hard** | Law, science, BCS and literature need outside knowledge. Removing them would make the task look easier than it really is. We *measure* difficulty instead (§9). |
 | **No RAG** (no looking things up) | If a model could search for facts, we would be measuring its search engine, not its ability to spot a wrong answer — and the no-context condition would become meaningless. |
 | **No new data collection** | The corpus is final. Effort goes into quality, not quantity. |
-| **Fixed model ladder** | Required by the course: N-gram → Skip-gram/word2vec → BiRNN/BiLSTM → BERT-family. We may add models but not replace these. |
+| **Fixed model ladder** | Required by the course: N-gram → Skip-gram/word2vec → BiRNN/BiLSTM → BERT-family. We may add models but not replace these. The ladder follows the NLP lab (Labs 1–5) step by step — see §18. |
 
 ---
 
@@ -624,7 +644,7 @@ dev/train rows were corrected rather than accepted.
 
 ---
 
-## 14. Step 10 (current) — Merging the annotation into the corpus
+## 14. Step 10 — Merging the annotation into the corpus
 
 ### 14.1 The problem this step solves
 
@@ -905,6 +925,24 @@ Each step was compared with what [PRD.md](PRD.md) and
 
 ### 16.4 Model training (planned — step 11, not used yet)
 
+**Lab-based models (Labs 1–5)**
+
+| Parameter | Value | Plain meaning |
+|---|---|---|
+| Word n-grams / character n-grams | 1–2 words / 3–5 characters | pieces of text the sparse models count; character pieces survive Bengali word endings |
+| Naive Bayes smoothing | α = 1 (Laplace) | add 1 to every count so an unseen word never gives probability 0 |
+| Character n-gram LM order | n = 3 (2–4 tried on dev) | predict each character from the 2 before it |
+| Skip-gram | 200 dimensions, window 5, words seen ≥ 2 times | each word becomes 200 numbers learned from its neighbours |
+| Stop words / stemming | off by default; tested as variants | kept off because they can delete না / নয় and hide contradiction errors |
+| RNN / BiRNN / BiLSTM hidden size | 256 (BiLSTM: 2 layers, dropout 0.3) | size of the network's running memory |
+| RNN learning rate | 1e-3 (Adam) | larger than for BERT, because these start from almost nothing |
+| Transformer from scratch | 128-number vectors, 4 attention heads, 2 layers | a small version of BERT's design, with no pretraining |
+| Transformer learning rate | 5e-4 with 10% warm-up | from-scratch Transformers are unstable with bigger steps |
+| Early stopping (RNNs, Transformer) | dev loss, patience 3 | stop when practice-test loss stops improving |
+| Output | 1 number → sigmoid | the probability the answer is **correct** |
+
+**Pretrained encoders (BanglaBERT etc.)**
+
 | Parameter | Value | Plain meaning |
 |---|---|---|
 | Learning rate | 2e-5 | how big each learning step is; small, because the model is already pretrained |
@@ -973,21 +1011,67 @@ flip). A model that scores well must be using the content.
 With retrieval, a model could look up the fact instead of judging the answer. We would be measuring
 the search step, and the closed-book condition would stop being closed-book.
 
+**"How does this project use what you learned in the NLP lab?"**
+Every rung of the model ladder comes from a lab (table in §18). Of the 33 topics taught, 26 are
+used and 7 are deliberately left out, each with a written reason (PRD §5.3b). The lab code is
+adapted, not copied: it was written for English, and run unchanged on Bengali it would delete every
+Bengali letter and digit.
+
+**"Why didn't you use lemmatization, spelling correction or the Seq2Seq model?"**
+- **Lemmatization** needs a dictionary and part-of-speech tags that don't exist reliably for
+  Bengali; the stemming test covers the same idea.
+- **Spelling correction** would "fix" exactly the mistakes the detector must find.
+- **Seq2Seq, text generation and sampling** produce text, and this project only judges text.
+- **POS tagging** needs per-word labels we don't have.
+
+**"Why not remove stop words, as the lab does?"**
+Bengali stop-word lists contain না, নয় and নি. Removing them turns "বিভক্ত নয়" (not divided) into
+"বিভক্ত" (divided) — the opposite meaning — and hides 212 contradiction errors. We keep them by
+default, and run one variant *with* them removed just to measure the damage.
+
+**"Why build a Transformer from scratch when BanglaBERT exists?"**
+It has the same design as BanglaBERT but learns only from our ~6,000 records. The difference
+between the two tells us how much of BanglaBERT's score comes from its pretraining on huge amounts
+of Bengali text rather than from its architecture.
+
 ---
 
 ## 18. What comes next
 
-In the order they will happen:
+### 18.1 How the project uses the NLP lab
 
-1. **Step 11 — the model ladder** (milestones M4–M5), each model on 3 seeds, scored on dev:
-   - **N-gram** (word + character pieces) with Logistic Regression and SVM — the simplest baseline.
-   - **Skip-gram / word2vec** word embeddings with Logistic Regression and XGBoost.
-   - **BiRNN, BiLSTM, BiLSTM + attention** — neural networks that read text in order.
-   - **Pretrained transformers:** BanglaBERT, MuRIL, XLM-R, mBERT, IndicBERT v2.
-   - **Further pretraining** of mBERT / XLM-R on unlabeled Bengali text.
-   - **Ensemble** of the best three, and an LLM zero-shot reference point.
-   - Classical models are *expected* to land around 0.50–0.65. That is a correct result, not a bug.
-3. **Step 12 — final evaluation** on `test.jsonl`, **once**, reported by condition, easy/hard,
+The model ladder climbs through the lab syllabus in order, then goes one step beyond it. Every rung
+is scored on dev; trained neural models run on 3 seeds.
+
+| Lab | What the lab teaches | What we build with it | What it tells us |
+|---|---|---|---|
+| **1** | Regex cleaning, tokenization, stop words, stemming, edit distance | Bengali cleaner and tokenizer (default). Stop words and stemming as **variants** (negation always kept). Edit distance between the answer and its own passage | whether classic cleaning helps Bengali; how close a wrong answer is to the passage |
+| **2** | Bag of Words, TF-IDF, N-gram language model | Word/character n-gram features; a **character n-gram LM** that scores how passage-like an answer is | the simplest learned detectors, and a softer version of the string trick |
+| **3** | Skip-gram, cosine similarity, Naive Bayes, Logistic Regression, averaged and TF-IDF-weighted embeddings, the "dog bit the man" limit | Naive Bayes + Logistic Regression + SVM; Skip-gram vectors averaged two ways; cosine similarity of answer and passage; a **word-order test** on every model | whether meaning (not just exact words) helps; proof of what bag-of-words models cannot see |
+| **4** | PyTorch, pretrained embeddings, RNN, BiRNN, BiLSTM, attention | Vanilla RNN → BiRNN → BiLSTM → BiLSTM + attention, starting from our Skip-gram vectors | what reading in order, in both directions, and paying attention add; *where* the model looked |
+| **5** | Transformer encoder from scratch, positional encoding, self-attention | A small Transformer trained only on our data | how much of BanglaBERT's score comes from pretraining |
+| beyond | — | BanglaBERT, MuRIL, XLM-R, mBERT, IndicBERT v2; further pretraining; ensemble; LLM reference | the strongest detector |
+
+**Left out on purpose:** lemmatization, spelling correction, text generation (Shannon game, LSTM
+sampling), POS tagging, Seq2Seq translation, word analogies — reasons in §17 and PRD §5.3b.
+
+**Two new reference numbers come with this.** Besides the exact string matcher (0.823 / 0.454 hard),
+a **fuzzy string matcher** ("the answer *nearly* appears in the passage") is reported too, so a
+model that only learned approximate string matching cannot pass as a real detector.
+
+### 18.2 In the order they will happen
+
+1. **Step 11 — the model ladder** (milestones M4–M5), rungs in the lab order of §18.1:
+   - **Lab 1–3 rungs:** Bengali cleaning and tokenization, n-gram models with Naive Bayes /
+     Logistic Regression / SVM, the character n-gram LM, Skip-gram models, similarity features,
+     and the preprocessing variants.
+   - **Lab 4–5 rungs:** vanilla RNN, BiRNN, BiLSTM, BiLSTM + attention, Transformer from scratch.
+   - **Beyond the lab:** BanglaBERT, MuRIL, XLM-R, mBERT, IndicBERT v2; further pretraining of mBERT /
+     XLM-R; ensemble of the best three; an LLM zero-shot reference point; three input formats.
+   - **Word-order test** on every trained model.
+   - Classical models are *expected* to land around 0.50–0.65, and the from-scratch Transformer well
+     below BanglaBERT. Those are correct results, not bugs.
+2. **Step 12 — final evaluation** on `test.jsonl`, **once**, reported by condition, easy/hard,
    subject and hallucination type, with statistical tests (McNemar, bootstrap confidence intervals)
    before claiming any model beats another.
 

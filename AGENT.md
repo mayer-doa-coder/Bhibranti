@@ -59,7 +59,10 @@ validity outranks every metric on every table.
 - Do **not** chase state-of-the-art architectures. The model ladder is **fixed** by pedagogical
   requirement (this is also a course deliverable that must demonstrate N-gram, Skip-gram, RNN,
   LSTM, and BERT). Substituting a "better" model for a required one is a regression, not an
-  improvement.
+  improvement. The ladder follows the course's `NLP Lab/` syllabus (Labs 1–5) — PRD §5.3b lists
+  the 26 lab topics used and the 7 excluded, with reasons.
+- Do **not** copy lab code onto Bengali text (English-only regex, NLTK stop words, Porter,
+  WordNet). Use the Bengali recipes in guide §6 / PRD §5.3c.
 - Do **not** use RAG or any inference-time retrieval (PRD §5.3a).
 - Do **not** collect or generate more data — the corpus is final.
 - Do **not** add fill-in-the-blank items — QA only; cloze is a different task.
@@ -127,7 +130,7 @@ project/
 |   |-- interim/bn_pool.jsonl              OK   56,480 cleaned records (unfiltered pool)
 |   |-- corpus/bn_v1/corpus.jsonl          OK   THE CORPUS - 4,480 pairs / 8,960 records
 |   |-- splits/                            OK   the locked splits
-|   |   |-- train.jsonl  dev.jsonl  test.jsonl      3,129 / 673 / 678 pairs
+|   |   |-- train.jsonl  dev.jsonl  test.jsonl      3,129 / 673 / 678 pairs (usable 3,067 / 619 / 614)
 |   |   \-- _pool_sanity/                  OK   throwaway, git-ignored, never train on it
 |   |-- annotated/agreement_test_v1/       OK   100 blind items for the M2 kappa check
 |   |   |-- items_for_annotation_BLANK.csv      <- copy twice, one per annotator
@@ -142,16 +145,22 @@ project/
 |   |-- build_annotation_sheets.py       OK   M3 sheets (6 documented guards)
 |   |-- validate_annotation.py           OK   checks filled sheets before merge
 |   |-- audit.py                           OK   shortcut probes  <- THE BLOCKING GATE
+|   |-- score_test_agreement.py            OK   Cohen's kappa on the full test split
+|   |-- merge_annotation.py                OK   human sheets -> types + `excluded` flags
+|   |-- splits.py                          OK   load_split() - the only data loader
+|   |-- text_bn.py                         TODO M10 Bengali cleaning/tokenizer/stop words/stemmer (Lab 1)
+|   |-- features.py                        TODO M11 char n-gram LM, M12 edit distance + cosine (Labs 1-3)
 |   |-- preprocess.py                      TODO input formats F1/F2/F3
-|   |-- train_classical.py                 TODO N-gram, Skip-gram, BiRNN, BiLSTM
-|   |-- train_transformer.py               TODO encoder fine-tuning
+|   |-- train_classical.py                 TODO M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram, M11, M12 (Labs 2-3)
+|   |-- train_neural.py                    TODO M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4-5)
+|   |-- train_transformer.py               TODO pretrained encoder fine-tuning (M4/M5)
 |   |-- further_pretrain.py                TODO MLM further pretraining (mBERT / XLM-R only)
-|   \-- evaluate.py                        TODO metrics, McNemar, bootstrap CI
+|   \-- evaluate.py                        TODO metrics, breakdowns, M14 word-order test, McNemar, bootstrap CI
 |-- notebooks/                             exploratory only; reusable code moves to src/
 |-- configs/schema.json                    OK   frozen record schema
 |-- results/
 |   |-- experiment_log.csv                 OK   every run, including failures
-|   \-- tables/                            TODO Tables 1-5, produced at M5/M6
+|   \-- tables/                            TODO Tables 1-8, produced at M5/M6
 \-- docs/
     |-- PRD.md                             OK   requirements and gates - the authority
     |-- IMPLEMENTATION_GUIDE.md            OK   recipes and hyperparameters
@@ -226,17 +235,16 @@ breaks Phase 2's inheritance. `script_condition`, `cmi`, and `error_span` are Ph
 | **Extrinsic** (no-context, factuality) | `fabricated`, `overclaim` |
 | **Faithful** (`label == 1`) | `none` |
 
-### 4.3 Corpus composition targets
+### 4.3 Corpus composition — as built (targets met)
 
-| Property | Target | Tolerance |
+| Property | Target | Actual |
 |---|---|---|
-| Total annotated pairs | 4,000 (floor 1,500) | — |
-| has-context / no-context | 60 / 40 | script-verified |
-| hallucinated / faithful | 50 / 50 | ±5% |
-| easy / hard | ~60 / 40 | — |
-| Train / Dev / Test | 3,000 / 500 / 500 | — |
-| Hard items (string shortcut does not work) | report always | 800 has-ctx / 332 no-ctx |
-| Human-written hallucinated answers held out in **test** | 100–200 | flagged |
+| Total pairs | ≥ 4,000 | **4,480** (8,960 records); **4,300 usable** after 180 human-flagged pairs were excluded (PRD §5.1d) |
+| has-context / no-context | 60 / 40 | 2,688 / 1,792 pairs |
+| hallucinated / faithful | 50 / 50 | exact, in every split, before and after exclusion |
+| easy / hard (pairs) | measured, not targeted | has-context 1,761 / 927 · no-context 1,385 / 407 |
+| Train / Dev / Test (pairs) | 70 / 15 / 15, by pair | 3,129 / 673 / 678 → usable **3,067 / 619 / 614** |
+| Human-written hallucinated answers | — | none exist: every record is `llm_generated` (a limitation to report) |
 
 ### 4.4 Non-negotiable data rules
 
@@ -269,50 +277,37 @@ separate generated from human-written items. Full register: `data/SOURCES.md`.
 
 `data/splits/{train,dev,test}.jsonl` are the real Phase 1 splits, built by
 `src/build_corpus.py` from `data/corpus/bn_v1/corpus.jsonl`. They are Bengali script,
-answerability-filtered, grouped by pair, and deterministic at seed 42.
+QA only (no fill-in-the-blank), grouped by pair, and deterministic at seed 42. Annotation is merged
+into them (`src/merge_annotation.py`); load them only with `src/splits.py`.
 
 `data/splits/_pool_sanity/` is a throwaway artifact of `build_bn_pool.py`, used only to
 check that script still runs. It is git-ignored. Never train on it and never report from it.
 
-## 5. Generation protocol
+## 5. Generation — not done in Phase 1
 
-> **The rule that governs everything: correct and hallucinated answers must be indistinguishable
-> except in factual content.**
+**Phase 1 generates no data. The corpus is final** (PRD §5.1). The source pool's QA pairs were
+built with LLM assistance before this project; the model and prompts are unrecorded (PRD Q4).
 
-Same generator model, same prompt template, same temperature, same requested length, same
-formatting instructions. Both classes are produced **in a single call per item** so they cannot
-diverge stylistically.
+The principle still matters when *reading* results: correct and hallucinated answers must differ
+only in factual content. That is what the metadata probe checks (§7, currently 0.534 / 0.514), and
+why answer-only models are reported beside the V3 probe.
 
-The prompt must forbid uncertainty markers in the hallucinated answer unless both answers carry
-them, and must request JSON with keys `faithful`, `hallucinated`, `error_span`.
-
-**Length control is programmatic, not prompted:**
-
-```python
-def length_ok(faithful, hallucinated, tol=0.15):
-    lf, lh = len(faithful.split()), len(hallucinated.split())
-    return abs(lf - lh) / max(lf, lh, 1) <= tol
-```
-
-Regenerate any failing pair. **Log the rejection rate** — above ~20% means the prompt needs
-tightening, not that the filter needs loosening.
-
-**Generation prompts are version-controlled** (R3). A prompt change is a commit with a rationale,
-and it invalidates every item generated with the old prompt.
-
-Difficulty: **easy** = wrong entity from a different domain (Newton → Shakespeare);
-**hard** = plausible near-miss (9.8 → 9.6 m/s²; 1971 → 1972; a sibling concept).
+Difficulty is **measured** by `src/build_corpus.py`, not generated: has-context **hard** = the
+string matcher cannot separate the pair's two answers; no-context **hard** = the wrong answer is a
+near-miss (character similarity ≥ 0.60).
 
 ---
 
 ## 6. Preprocessing arms and input formats
 
-Build **three arms** and **three formats**; sweep all 9 on the best model (highest-ROI step).
+**Two arms × three formats** = 6 configurations, swept on the best pretrained encoder (M9, the
+highest-ROI step). The non-pretrained rungs use the Bengali cleaning, tokenizer and M10 variants in
+guide §6 instead (PRD §5.3c: never copy the English lab code).
 
 | Arm | Definition |
 |---|---|
-| **A — Raw** | As-is. Strip URLs, collapse whitespace, remove PII. |
-| **B — Normalised** | Apply csebuetnlp `normalize()` to the Bengali text. Required for BanglaBERT. |
+| **A — Raw** | Guide §6 cleaning only (NFC, citation marks, whitespace). Digits and negation kept. |
+| **B — Normalised** | A + csebuetnlp `normalize()`. Required for BanglaBERT. |
 | ~~C — Dual~~ | **Phase 2 only.** There is no second script view in Phase 1. |
 
 > **Caveat:** csebuetnlp `normalize()` is built for **Bengali script**. Apply it *after*
@@ -342,7 +337,8 @@ def cmi(tokens_lang_counts, n_tokens, n_language_independent):
 
 ## 7. The shortcut audit — the blocking gate
 
-**Run this on the 500-item pilot BEFORE generating the full corpus (V2, M1).**
+**Rerun after every change to the corpus or its annotation (V2).** Current: **PASS** — 0.534 on all
+records, 0.514 on usable records; both must stay below 0.60. `src/audit.py` checks both.
 
 The metadata-only probe trains logistic regression on features containing **no content words**:
 token count, char count, mean token length, latin-character ratio, punctuation counts, digit ratio,
@@ -374,12 +370,23 @@ dropping features, or re-splitting until it passes.
 
 ### 8.1 Required models (all Must-priority — none may be dropped)
 
-| Tier | Models |
-|---|---|
-| **M1 N-gram** | TF-IDF (word 1–2 grams + char 3–5 grams) → LogReg, LinearSVC. Log **OOV rate**. |
-| **M2 Skip-gram** | gensim Word2Vec `sg=1, dim=200, window=5, min_count=2`, averaged → LogReg, XGBoost. Log **vocab coverage**. |
-| **M3 Recurrent** | BiRNN (1×256), BiLSTM (2×256, dropout 0.3), BiLSTM + additive attention. Skip-gram init. |
-| **M4/M5 Encoders** | ≥ 5 fine-tuned, **must include `csebuetnlp/banglabert` and `google/muril-base-cased`** |
+| Tier | Models | Lab |
+|---|---|---|
+| **M1 Sparse n-gram** | BoW and TF-IDF (word 1–2 + char 3–5 grams, one block per record part) → **Naive Bayes** (α = 1), LogReg, LinearSVC. Log **OOV rate**. | 2, 3 |
+| **M2 Skip-gram** | gensim Word2Vec `sg=1, dim=200, window=5, min_count=2` on the train split; **mean** and **TF-IDF-weighted mean** → LogReg, XGBoost. Log **vocab coverage**. | 3 |
+| **M3 Recurrent (PyTorch)** | vanilla RNN (1×256), BiRNN (1×256), BiLSTM (2×256, dropout 0.3), BiLSTM + **dot-product attention** (`torch.bmm`). Skip-gram init via `nn.Embedding.from_pretrained`; packed sequences; single logit + `BCEWithLogitsLoss`. | 4 |
+| **M4/M5 Encoders** | ≥ 5 fine-tuned, **must include `csebuetnlp/banglabert` and `google/muril-base-cased`** | — |
+| **M10 Preprocessing ablations** | Bengali clean + tokenize (default); + stop words (negation kept); + stemming (never strips negation); V2-demo with negation removed | 1 |
+| **M11 Char n-gram LM** | Laplace-smoothed; (a) passage-conditioned answer score, (b) class-conditional classifier (answer-only → report beside V3) | 2, 3 |
+| **M12 Similarity features** | normalised Levenshtein + Skip-gram cosine, answer vs **its own** passage/question → LogReg; defines the V6 fuzzy string-matcher baseline | 1, 3 |
+| **M13 Transformer from scratch** | d_model 128, 4 heads, 2 layers, sine/cosine positional encoding, padding mask, masked mean pooling | 5 |
+| **M14 Word-order diagnostic** | shuffle token order on dev, report Δ macro-F1 per model and per type | 3 |
+
+Excluded lab topics (PRD §5.3b): lemmatization, spelling correction, text generation / Shannon
+game, LSTM LM sampling, POS tagging, Seq2Seq translation, word analogies. Pretrained fastText
+vectors: not used (decision 2026-09-17).
+
+Full recipes: guide §6 (preprocessing) and §7.1–7.1d (models); lab → code map in guide Appendix B.
 
 Encoder pool: `csebuetnlp/banglabert` (ELECTRA discriminator, needs the normaliser; primary for Phase 1),
 `csebuetnlp/banglabert`, `google/muril-base-cased`, `xlm-roberta-base`,
@@ -421,6 +428,8 @@ MLM, 15% masking, `lr=1e-5`, batch 32, 5 epochs, on unlabeled transliterated Ban
 | **Seeds** | 3 seeds (42/1337/2024), report **mean ± std** |
 | **Significance** | McNemar's test for pairwise comparison; bootstrap 95% CI (1000 resamples) on the headline |
 | **Threshold** | Never default to 0.5. Sweep on **dev only**, apply to test **once**. |
+| **Baselines beside every has-context score** | exact string matcher (0.823 / 0.454 hard, usable data) and fuzzy string matcher (V6) |
+| **Ablations and diagnostics** | M10 preprocessing grid and M14 word-order test on **dev only** |
 | **Test set** | Opened exactly once, at M6 |
 
 A 1-point gap across a single seed is **noise**. Do not claim model A beats model B without a
@@ -433,7 +442,9 @@ significance test.
 | Has-context | **0.80 – 0.90** | > 0.95 |
 | No-context | **0.60 – 0.75** | > 0.85 |
 | Hard subset | 0.55 – 0.70 | — |
-| Classical @ 4K | 0.50 – 0.65 | (expected — not a failure) |
+| Classical @ 4K (M1, M2, M11) | 0.50 – 0.65 | (expected — not a failure) |
+| Recurrent (M3) | 0.55 – 0.70 | — |
+| Transformer from scratch (M13) | near M3, well below pretrained | above pretrained → audit |
 | Zero-shot LLM | 0.60 – 0.72 | — |
 
 External anchors: ViHallu best **84.80** (encoder-only baseline 32.83); BanTH best **77.36**;
@@ -445,7 +456,7 @@ rather than engineering them upward.
 
 ### 8.6 Score maximisation, in ROI order
 
-1. **Input format × arm sweep** (9 configs) — often 3–6 points. *Do this first.*
+1. **Input format × arm sweep** (6 configs) — often 3–6 points. *Do this first.*
 2. **Further pretraining** — ~2 points on the right base model.
 3. **Hard-negative balance** — if easy 0.90 / hard 0.55, add hard examples to training.
 4. **Soft-voting ensemble** of top 3 encoders — reliably 1–3 points.
@@ -455,27 +466,32 @@ rather than engineering them upward.
 
 ### 8.7 LLM reference point (M8)
 
-Not a competitor — a **ceiling marker** and reviewer insurance. Zero-shot / few-shot on 300–500 test
-items. Test four prompting strategies: non-explanatory, CoT, explanation, and **translation-based**
-(prepend "translate the transliterated text into standard Bangla/English", then classify) — the last
-topped BanTH's zero-shot results. Fine-tuned encoders should win by roughly 8 points; if a zero-shot
+Not a competitor — a **ceiling marker** and reviewer insurance. Zero-shot / few-shot on 300–500
+items; prompts developed on dev, test scored only inside the single M6 evaluation. Test three
+prompting strategies: non-explanatory, CoT, explanation. (BanTH's translation-based prompt is for
+transliterated text — Phase 2 only.)
+
+**No retrieval (PRD §5.3a):** the prompt holds only the record's own question, passage and answer.
+Few-shot examples are **one fixed set** drawn once from train (seed 42) — never chosen per item by
+similarity. No browsing or search tools. Fine-tuned encoders should win by roughly 8 points; if a zero-shot
 LLM wins by a wide margin, the training data is too small or too noisy.
 
 ---
 
 ## 9. Milestones (PRD §8)
 
-| M# | Week | Milestone | Exit criteria |
+| M# | Milestone | Exit criteria | Status |
 |---|---|---|---|
-| **M0** | 1 | Foundations | Repo, schema frozen, licences audited, seeds fixed, **test set designated and locked** |
-| **M1** | 1 | **Pilot + validity gate** | 500 items; **shortcut probe < 0.60**; prompt finalised |
-| **M2** | 2 | Annotation protocol | Guidelines written; 100-item pilot annotated; κ computed; guidelines revised |
-| **M3** | 3 | Corpus complete | 4,000 items generated + annotated; IAA reported; splits created |
-| **M4** | 4 | Pipeline working | Classical ladder + 1 transformer end-to-end; log populated |
-| **M5** | 5 | Full benchmark | All models × 3 arms × 3 formats; 5-fold CV; 3 seeds |
-| **M6** | 6 | **Phase 1 complete** | FPT + ensemble + threshold + LLM reference; Tables 1–5; final audit passed |
+| **M0** | Foundations | Repo, schema frozen, seeds fixed, source pool ingested and audited | ✅ |
+| **M1** | Corpus built + validity gate | 4,480 pairs, QA only, split by pair; **shortcut probe < 0.60** | ✅ 0.534 |
+| **M2** | Annotation protocol | Guidelines written; 100-item blind pilot; **κ ≥ 0.60**; guidelines revised | ✅ κ 0.717 |
+| **M3** | Corpus annotated | Test double-annotated, dev + 20% train single; adjudicated; merged; flagged pairs excluded | ✅ κ 0.865; 4,300 usable pairs |
+| **M4** | Model ladder trained | M1–M5, M10–M13 run and logged; V6 fuzzy baseline measured | ⬜ **next** |
+| **M5** | Sweeps and extensions | M6 FPT, M7 ensemble, M8 LLM reference, M9 formats, M14 word-order test | ⬜ |
+| **M6** | **Phase 1 complete** | Test scored **once**; Tables 1–8; final audit passed; report with limitations | ⬜ |
 
-**M1 is a hard gate. No progression to M3 without a passing shortcut probe.**
+**The shortcut gate (§7) is a hard gate:** rerun it after any corpus change; nothing is trained on a
+corpus that fails it.
 
 **Annotation levels:** test = 100% human, double-annotated, adjudicated; dev = 100% human, single
 annotator + spot check; train = generator label + human verification on a 20% sample (if that sample
@@ -570,7 +586,7 @@ neither.
 | ID | Deferred |
 |---|---|
 | N1 | Script-controlled CMI degradation study (record `cmi`; don't run the experiment) |
-| N2 | Transliteration normalisation as a *research finding* (it's a preprocessing arm here) |
+| N2 | Transliteration normalisation as a *research finding* |
 | N3 | Natural vs. synthetic transfer experiment |
 | N4 | Span-level hallucination annotation/evaluation (capture `error_span`; don't evaluate on it) |
 | N5 | Tokenizer fertility analysis |
@@ -586,13 +602,13 @@ If a task looks like Phase 2 work, **say so and stop** rather than building it.
 
 ## 12. Deliverables checklist (PRD §13 — Definition of Done)
 
-- [ ] Corpus ≥ 4,000 annotated pairs with train/dev/test splits
-- [ ] Inter-annotator κ ≥ 0.60 reported
-- [ ] Shortcut probe < 0.60 macro-F1 on the **final** corpus
-- [ ] All Must-priority models (M1–M5) trained and benchmarked
-- [ ] Has-context macro-F1 ≥ 0.80
+- [x] Corpus ≥ 4,000 annotated pairs with train/dev/test splits (4,480; 4,300 usable)
+- [x] Inter-annotator κ ≥ 0.60 reported (0.717 pilot, 0.865 full test)
+- [x] Shortcut probe < 0.60 macro-F1 on the **final** corpus (0.534 all / 0.514 usable)
+- [ ] All ladder models (M1–M14) trained and benchmarked; every lab topic in PRD §5.3b covered
+- [ ] Has-context **hard subset** macro-F1 ≥ 0.80
 - [ ] No-context macro-F1 ≥ 0.60
-- [ ] Results Tables 1–5 produced
+- [ ] Results Tables 1–8 produced (guide §12.4)
 - [ ] 5-fold CV and 3-seed results reported with variance
 - [ ] Test set evaluated **exactly once**
 - [ ] Experiment log complete, including failed runs
@@ -600,8 +616,9 @@ If a task looks like Phase 2 work, **say so and stop** rather than building it.
 - [ ] Phase 1 technical report written, **including a limitations section**
 - [ ] `data/SOURCES.md` complete with licences
 
-**Required tables:** (1) main results by model tier, (2) difficulty breakdown, (3) per-hallucination-type
-F1, (4) preprocessing arm × input format ablation, (5) shortcut audit results.
+**Required tables:** (1) main results by model tier, in lab order, (2) difficulty breakdown,
+(3) per-hallucination-type F1, (4) normalisation × input format ablation, (5) shortcut audit
+results, (6) M10 preprocessing ablation, (7) M14 word-order diagnostic, (8) per-subject F1.
 
 ---
 

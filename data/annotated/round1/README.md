@@ -1,6 +1,7 @@
 # Round 1 — the real annotation (M3)
 
-**Status: all four sets annotated and validated. Not yet merged into the corpus.**
+**Status: COMPLETE — all four sets annotated, validated, adjudicated, and merged into the corpus
+and splits (2026-09-17).**
 
 Built by [`src/build_annotation_sheets.py`](../../../src/build_annotation_sheets.py), seed 42,
 reproducible. Rules followed: [`docs/ANNOTATION_GUIDELINES.md`](../../../docs/ANNOTATION_GUIDELINES.md)

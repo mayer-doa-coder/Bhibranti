@@ -14,7 +14,8 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 | | |
 |---|---|
 | **RAG is forbidden.** | No retrieval-augmented anything. No vector store, no nearest-neighbour lookup over the corpus, no retrieving passages or similar examples at inference. The model sees the question, the passage that is already in the record, and the answer. Nothing else. |
-| **Allowed** | N-gram · Skip-gram · word2vec · word & text embeddings · RNN · LSTM/BiLSTM (+attention) · BERT-family encoders · anything else that is not RAG. Adding techniques is fine; the required ladder below may not be *replaced*. |
+| **Allowed** | N-gram · Skip-gram · word2vec · word & text embeddings · RNN · LSTM/BiLSTM (+attention) · BERT-family encoders · anything else that is not RAG. Adding techniques is fine; the required ladder below may not be *replaced*. Edit distance, cosine similarity and an n-gram LM are fine **when they compare a record only with itself** (PRD §5.3a). |
+| **Follows the NLP lab.** | The ladder covers the course's `NLP Lab/` syllabus (Labs 1–5): 26 lab topics used, 7 excluded with reasons — PRD §5.3b. Adapt lab code to Bengali; never copy it (§5.3c). |
 | **Data collection is finished.** | The corpus is final. Do not collect, scrape, generate, or synthesise more data. Work with `data/corpus/bn_v1/`. |
 | **QA only — no fill-in-the-blank.** | Cloze / শূন্যস্থান পূরণ items are excluded. They teach span-copying rather than answer checking. This removed `geography` entirely, which was 100% cloze. |
 
@@ -113,10 +114,14 @@ python src/merge_annotation.py --dry-run     # sheets -> corpus report; drop --d
 # M2 gate — PASSED at kappa 0.717. Rerun any time:
 python src/score_agreement.py \n  --a data/annotated/agreement_test_v1/items_for_annotation_tawhid.csv \n  --b data/annotated/agreement_test_v1/items_for_annotation_shejan.csv
 
-# Not yet written
+# Not yet written (M4-M6) - see guide §1.3 for the planned modules
 python src/preprocess.py --format F3 --in data/splits/ --out data/processed/
-python src/train_classical.py    --model ngram_logreg --seed 42
+python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
+python src/train_classical.py    --model tfidf_nb --variant V2       # M10 preprocessing ablation
+python src/train_neural.py       --model bilstm_attn --seed 42       # M3 (Lab 4)
+python src/train_neural.py       --model transformer_scratch --seed 42   # M13 (Lab 5)
 python src/train_transformer.py  --model csebuetnlp/banglabert --seed 42
+python src/evaluate.py --checkpoint out/best --split dev --shuffle-order # M14 word-order test
 python src/evaluate.py --checkpoint out/best --split dev      # any number of times
 python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at M6
 ```
@@ -142,11 +147,15 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/splits.py` | ✅ `load_split("train")` — **the only way to load data for training or scoring**; drops excluded pairs |
 | [docs/PROJECT_WALKTHROUGH.md](docs/PROJECT_WALKTHROUGH.md) | Beginner-friendly explanation of every step so far — **keep it updated as steps finish** |
 | `src/audit.py` | ✅ Shortcut probes + structural checks |
+| `src/text_bn.py` | ⬜ M10 Bengali cleaning, tokenizer, stop words, stemmer (Lab 1) |
+| `src/features.py` | ⬜ M11 char n-gram LM, M12 edit distance + cosine features (Labs 1–3) |
 | `src/preprocess.py` | ⬜ Input formats F1/F2/F3 |
-| `src/train_classical.py` | ⬜ N-gram, Skip-gram/word2vec, BiRNN, BiLSTM(+attn) |
-| `src/train_transformer.py` | ⬜ Encoder fine-tuning |
+| `src/train_classical.py` | ⬜ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3) |
+| `src/train_neural.py` | ⬜ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5) |
+| `src/train_transformer.py` | ⬜ Pretrained encoder fine-tuning (M4/M5) |
 | `src/further_pretrain.py` | ⬜ MLM further pretraining (mBERT / XLM-R only) |
-| `src/evaluate.py` | ⬜ Metrics, breakdowns, McNemar, bootstrap CI |
+| `src/evaluate.py` | ⬜ Metrics, breakdowns, M14 word-order test, McNemar, bootstrap CI |
+| `NLP Lab/` | Course lab guides + notebooks — the syllabus the ladder follows. Read-only |
 | `data/DATASET_AUDIT.md` | **Read first.** Audit of the source pool |
 | `data/corpus/bn_v1/corpus.jsonl` | ✅ The Phase 1 corpus, 4,480 pairs |
 | `data/splits/` | ✅ `train/dev/test.jsonl` — the real splits |
@@ -178,6 +187,16 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
   results are reported on **dev/test only**
 - **`hallucination_type`, `type_source`, `annotator_1/2`, `adjudicated` reveal the label — never a
   model input**
+- **Model ladder (PRD §5.3), in lab order:** M1 BoW/TF-IDF + Naive Bayes/LR/SVM → M11 char n-gram
+  LM → M2 Skip-gram (mean / TF-IDF-weighted) + LR/XGBoost → M12 edit-distance + cosine features →
+  M3 vanilla RNN, BiRNN, BiLSTM, BiLSTM + dot-product attention → M13 Transformer from scratch →
+  M4/M5 pretrained encoders → M6 FPT → M7 ensemble → M8 LLM reference. Plus M9 input formats,
+  M10 preprocessing ablations, M14 word-order diagnostic
+- **Baselines to report beside has-context scores:** exact string matcher (0.823 / 0.454 hard) and
+  the fuzzy string matcher (V6, measured at M4)
+- Recurrent / from-scratch defaults: Adam `lr=1e-3` (RNNs) / `5e-4` + warm-up (Transformer),
+  `batch=32`, early stop on dev loss (patience 3), single logit + `BCEWithLogitsLoss`,
+  sigmoid = P(correct)
 
 ---
 
@@ -196,12 +215,20 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 - **Break results down by subject too.** Law, science and BCS items are harder to verify; if the
   model collapses on those, that is a finding worth reporting, not something to hide.
 - **Use McNemar + bootstrap CI** before claiming one model beats another.
+- **Keep digits and negation words (না, নয়, নি, নেই, নাই) in every preprocessing variant** except the
+  one labelled V2-demo. They carry the `numeric` and `contradiction` errors.
+- **Apply Unicode NFC** to text and to any stop-word / suffix list before matching.
+- **Report answer-only models** (M11b class-conditional LM) next to the V3 answer-only probe.
+- **Say which lab each result comes from** (Tables 1 and Appendix B of the guide) — the ladder is
+  also a course deliverable.
 - **Investigate any macro-F1 > 0.95** as leakage.
 
 ## DON'T
 
 - **DON'T use RAG.** No retrieval at inference, no vector database, no nearest-neighbour lookup
-  over training examples. The passage in the record is the only context the model gets.
+  over training examples. The passage in the record is the only context the model gets. For the
+  LLM reference (M8): zero-shot, or **one fixed** few-shot set for every item — never examples
+  picked per item by similarity, and no search/browsing tools (PRD §5.3a).
 - **DON'T collect or generate more data.** The corpus is final.
 - **DON'T add fill-in-the-blank items back.** QA only — cloze is a different task.
 - **DON'T touch `data/splits/test.jsonl`** except for the single sanctioned M6 evaluation.
@@ -212,7 +239,17 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 - **DON'T use `AutoModelForMaskedLM` on BanglaBERT** — it is an ELECTRA discriminator. Further
   pretraining targets mBERT and XLM-R only.
 - **DON'T swap out a required model.** The ladder (N-gram → Skip-gram → BiRNN/BiLSTM →
-  BERT-family) is fixed by the course requirement. Adding is fine; replacing is not.
+  BERT-family, extended to cover the NLP lab in M10–M14) is fixed by the course requirement.
+  Adding is fine; replacing is not.
+- **DON'T copy lab code onto Bengali.** `re.sub(r'[^A-Za-z\s]', '', text)` deletes all Bengali and
+  all digits; NLTK `word_tokenize`, English `stopwords`, `PorterStemmer`, `WordNetLemmatizer` are
+  English-only. Use the Bengali recipes in guide §6.
+- **DON'T compare a record with other records** for features (edit distance, cosine, LM). Only its
+  own question and passage. Anything else is retrieval.
+- **DON'T add the excluded lab topics** — lemmatization, spelling correction, text generation,
+  temperature sampling, POS tagging, Seq2Seq translation (PRD §5.3b says why).
+- **DON'T use pretrained fastText vectors** — decided 2026-09-17; Skip-gram is trained on the
+  train split.
 - **DON'T rename, remove, or repurpose a schema field.** `cmi`, `script_condition`, and
   `error_span` are Phase 2 payload: populate them, never evaluate on them.
 - **DON'T hand-curate a split** or re-roll a seed until the numbers improve.
@@ -243,3 +280,8 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | CUDA OOM | `batch_size=16` + gradient accumulation. Don't change `max_length` mid-experiment |
 | Score plateaued | ROI order: input format sweep → FPT → hard-negative balance → ensemble → threshold |
 | Per-class metrics look swapped | `1` is the **correct** class here, not the hallucinated one |
+| Stop words / stemming lower `contradiction` F1 | Expected if negation was stripped — check the list lost না/নয়/নি; that is exactly why V1 is the default |
+| BoW model changes under M14 shuffling | Bug — a bag-of-words model cannot see order. Check the shuffle is done on the tokens *before* the same fitted vectorizer runs, and that no word was dropped or duplicated |
+| Transformer from scratch far below BanglaBERT | Expected — that gap is what pretraining is worth. Don't tune it away |
+| Stop-word list matches nothing | Unicode form mismatch (য় as U+09DF vs য + ়). Apply NFC to the list |
+| Beats 0.454 on hard but not the fuzzy matcher | The model learned fuzzy string matching, not grounding (V6) |
