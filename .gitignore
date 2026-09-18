@@ -74,3 +74,7 @@ scratch/
 # Throwaway sanity splits from build_bn_pool.py. The real splits are
 # data/splits/{train,dev,test}.jsonl, built by src/build_corpus.py.
 data/splits/_pool_sanity/
+
+# Formatted model inputs, rebuilt any time by src/preprocess.py. Keeping them out of
+# git avoids a second, stale copy of the corpus drifting away from data/splits/.
+data/processed/

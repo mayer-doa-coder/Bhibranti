@@ -1,0 +1,5 @@
+model,n,macro_f1,accuracy,has_context,no_context,easy,hard
+exact string match,1238,0.678,0.7,0.85,0.333,0.767,0.44
+fuzzy string match (V6),1238,0.558,0.56,0.572,0.333,0.562,0.539
+always says correct,1238,0.333,0.5,0.333,0.333,0.333,0.333
+always says hallucinated,1238,0.333,0.5,0.333,0.333,0.333,0.333

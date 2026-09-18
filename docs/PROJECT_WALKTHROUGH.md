@@ -1114,3 +1114,137 @@ runs 27 small tests, one per rule. The test split was not read.
 
 **To change something** (e.g. a teacher asks to keep "শুরু" too): add the word to
 `configs/bn_protected_words.txt`, then rerun the two commands above.
+
+### 18.4 Step 11.2 (done) — Comparing the answer with the passage, `src/features.py`
+
+**The problem.** Counting words tells a model *which* words an answer uses. It does not tell it
+whether those words match the passage sitting right next to them. So we measure that directly.
+
+**What it produces.** For every record, a few simple numbers:
+
+| Number | The question it answers |
+|---|---|
+| Found in passage? | Do these exact words appear in the passage? |
+| How far off? | How many letters would have to change to find the answer in the passage? |
+| Word overlap | What share of the answer's words are in the passage? |
+| Sounds like the passage? | Would this passage naturally produce these letters? |
+| Answer length, digit share | How long is the answer; how much of it is numbers |
+
+**The two lab ideas behind it**
+
+- **Edit distance (Lab 1)** — the number of letter changes between two pieces of text.
+  "১৭০৪" is in the passage → 0 changes. "১৭০৫" → 1 change. Small number, close match.
+- **N-gram language model (Lab 2)** — build a tiny model from *that record's own passage*, then
+  ask how likely the answer's letters are. It's a gentler version of exact matching: it still
+  gives credit when one letter is different.
+
+**Two problems the real data caused, and the fixes**
+
+- Passages run to 3,127 letters while answers average 16. Checking every position separately would
+  take billions of steps, so we use the textbook "start anywhere" version of the edit-distance
+  table. One pass, and it turned out to be *more* accurate too.
+- 198 answers end with the Bengali full stop "।" where the passage doesn't. Before trimming it,
+  the code reported those answers as missing from the passage when they were plainly there.
+
+**What we found (the useful part).** The table shows how well each number separates right from
+wrong answers. 0.50 means useless, 1.00 means perfect.
+
+| Number | On records with a passage | **On the hard ones** |
+|---|---|---|
+| Found in passage? | 0.851 | 0.528 — almost useless |
+| Word overlap | 0.774 | 0.613 |
+| Sounds like the passage? | 0.700 | **0.657 — the best one** |
+
+That is the whole reason this file exists. On hard records, exact matching dies — that is what
+"hard" means — but the gentler measures still work.
+
+**A tougher target for hard records.** We also tested a "nearly matches" rule: call an answer
+correct if it *almost* appears in the passage.
+
+| Rule | Score on hard dev records |
+|---|---|
+| Exact match | 0.487 |
+| **Nearly matches** (about 40% of letters may differ) | **0.591** |
+
+So a real model must beat **0.591** on hard records, not 0.487. Oddly, that same looseness *hurts*
+everywhere else: on easy records exact matching is already nearly perfect, so allowing differences
+only lets wrong answers slip through.
+
+**One reassuring result.** We trained a model on the answer text *alone* — no question, no passage —
+to check whether wrong answers have a give-away writing style. It scored 0.529–0.546, no better
+than the existing answer-only check. Good: there is no fingerprint for a model to cheat with.
+
+**Checked.** The fast edit distance is verified against a trusted library and against brute force.
+24 tests. The test split was never opened.
+
+### 18.5 Step 11.3 (done) — Deciding what the model reads, `src/preprocess.py`
+
+**The problem.** A model has to be handed one piece of text. Which pieces, in what order? We build
+three versions so we can test which works best:
+
+| Version | What goes in |
+|---|---|
+| **F1** | question + answer |
+| **F2** | passage + question + answer, all together |
+| **F3** | passage as one part, question + answer as the other — like asking, "does this passage support this?" |
+
+Records with no passage always come out as F1; there is nothing else to include.
+
+**The one rule that matters.** A model can only read so much at once (our limit: 256 words and
+punctuation marks). When a record is too long, **only the passage is shortened — never the question
+or the answer.** If the answer were cut off, the model would be grading something it cannot see.
+
+**Why we cut the passage from the end, and nothing cleverer.** We measured what the simple cut
+actually costs, using the records where the answer can be found inside its own passage:
+
+| Limit | Records needing a cut | Records that lose their evidence |
+|---|---|---|
+| **256 (what we use)** | 1.5% | **7 out of 1,634 — about 1 in 230** |
+| 128 | 20.4% | 117 out of 1,634 |
+
+A cleverer version — keep the part of the passage that best matches the **question** — saves only 2
+more of those 7. Not worth the extra machinery.
+
+**One tempting idea we refused.** We could keep the part of the passage that best matches the
+**answer**. That would save many more — and it would be cheating. It would quietly hand the model
+the evidence for correct answers only, which is the same shortcut this whole project exists to
+avoid. The reason is written into the file so nobody adds it later.
+
+**Checked.** On all 7,372 train and dev records: the answer and the question always survive, the
+passage is only ever shortened (never altered), and both records of a pair get the same question and
+passage — so **only the answer differs**, which is the thing being judged. 22 tests.
+
+### 18.6 Step 11.4 (done) — The marking scheme, `src/evaluate.py`
+
+**The problem.** If every model brought its own way of scoring, no two scores could be compared. So
+this was built **before** the first model.
+
+**What it reports for every model**
+
+- The main score, how many hallucinations it **caught**, how many it **missed**, and how many good
+  answers it **wrongly flagged**.
+- The same numbers split by: with/without passage, easy/hard, school subject, and kind of mistake.
+- The no-learning rules recomputed **on the same records**, with a plain verdict: does this model
+  beat them or not?
+
+**Three careful decisions**
+
+| Decision | Why |
+|---|---|
+| The margin of error is worked out by resampling **whole question pairs**, not single answers | Both answers to one question share a passage, so they rise and fall together. Counting them separately would make a model look more certain than it really is. |
+| For each *kind* of mistake, we report the **catch rate** instead of the main score | A group like "all the numeric errors" holds only wrong answers, so the usual score has no meaning there. |
+| A separate row for **"has a passage + hard"** | That exact group is the project's 0.80 target. The plain "hard" row mixes in no-passage records and gives a different number (0.487 against 0.440). |
+
+**Two gaps it prints instead of hiding**
+
+- No "human-written versus AI-written" comparison, because every record in our corpus was built
+  with AI help.
+- Groups that are too small to trust are labelled "(small)". Some dev subjects have only 22
+  records, where a score can swing wildly.
+
+**Protection built in.** Scoring the test set refuses to run without an explicit `--final` flag,
+because the test set may be used only once, right at the end.
+
+**Proof it works.** It already scored the no-learning rules on dev: the exact-match rule gets 0.850
+*with* a passage but 0.333 *without* one, and only 0.487 on the target group. 28 tests check the
+arithmetic against answers worked out by hand, and the results match scikit-learn exactly.

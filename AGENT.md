@@ -42,6 +42,8 @@ no Banglish anywhere in Phase 1.
 > **And a has-context score reported without its string-matcher baseline is not a result.**
 > The rule "if the answer appears in the passage, call it correct" already scores **0.823** on
 > all usable has-context items, and **0.454** on the hard subset. Quote both, every time.
+> On hard records the tougher bar is the **fuzzy** matcher (V6): **0.591** on dev hard, where the
+> exact rule gets 0.487. Beat the best rule on each row, not the weakest.
 >
 > **Load data only through `src/splits.py`.** It drops the 180 human-flagged pairs that are
 > excluded from training and scoring (PRD §5.1d).
@@ -149,13 +151,13 @@ project/
 |   |-- merge_annotation.py                OK   human sheets -> types + `excluded` flags
 |   |-- splits.py                          OK   load_split() - the only data loader
 |   |-- text_bn.py                         OK   Bengali cleaning/tokenizer/stop words/stemmer (Lab 1); --check
-|   |-- features.py                        TODO M11 char n-gram LM, M12 edit distance + cosine (Labs 1-3)
-|   |-- preprocess.py                      TODO input formats F1/F2/F3
+|   |-- features.py                        OK   M11 char n-gram LM, M12 edit distance, V6 baseline (Labs 1-3)
+|   |-- preprocess.py                      OK   input formats F1/F2/F3; cuts the passage only
 |   |-- train_classical.py                 TODO M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram, M11, M12 (Labs 2-3)
 |   |-- train_neural.py                    TODO M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4-5)
 |   |-- train_transformer.py               TODO pretrained encoder fine-tuning (M4/M5)
 |   |-- further_pretrain.py                TODO MLM further pretraining (mBERT / XLM-R only)
-|   \-- evaluate.py                        TODO metrics, breakdowns, M14 word-order test, McNemar, bootstrap CI
+|   \-- evaluate.py                        OK   metrics, breakdowns, M14 shuffling, McNemar, pair bootstrap
 |-- notebooks/                             exploratory only; reusable code moves to src/
 |-- configs/schema.json                    OK   frozen record schema
 |-- results/

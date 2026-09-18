@@ -22,15 +22,15 @@
 | Safety/shortcut check | ✅ Passing | `src/audit.py` |
 | Load data safely (skips 180 bad pairs) | ✅ Ready to use | `src/splits.py` |
 | Bengali text cleanup tools | ✅ Done — 27 tests pass, `--check` passes on train+dev | `src/text_bn.py`, `tests/test_text_bn.py` |
-| Hand-made features (n-gram LM, edit distance) | ⬜ Not built yet | `src/features.py` (planned) |
-| Input-format builder | ⬜ Not built yet | `src/preprocess.py` (planned) |
+| Hand-made features (n-gram LM, edit distance) | ✅ Done — 24 tests pass; V6 baseline measured | `src/features.py`, `tests/test_features.py` |
+| Input-format builder | ✅ Done — 22 tests pass; answer/question never truncated | `src/preprocess.py`, `tests/test_preprocess.py` |
 | Simple models (M1, M2, M11, M12) | ⬜ Not built yet | `src/train_classical.py` (planned) |
 | Neural models (M3, M13) | ⬜ Not built yet | `src/train_neural.py` (planned) |
 | Pretrained transformers (M4/M5) | ⬜ Not built yet | `src/train_transformer.py` (planned) |
 | Further pretraining (M6) | ⬜ Not built yet | `src/further_pretrain.py` (planned) |
-| Scoring + result tables | ⬜ Not built yet | `src/evaluate.py` (planned) |
+| Scoring + result tables | ✅ Done — 28 tests pass; Table 5 written | `src/evaluate.py`, `tests/test_evaluate.py` |
 
-**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: step 1 (Bengali text tools, §6) is done. Next is `src/features.py`.**
+**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: steps 1–4 are done — Bengali text tools (§6), the hand-made features (§7.1a, §7.1b), the input formats (§6) and the scoring code (§12). Next is `src/train_classical.py`, the first real models.**
 
 ---
 
@@ -108,13 +108,13 @@ Bhibranti/
 │   ├── audit.py                    ✅ the safety check
 │   ├── splits.py                   ✅ the ONLY approved way to load data
 │   ├── text_bn.py                  ✅ Bengali cleanup + tokenizer + stop words + stemmer
-│   ├── features.py                 ⬜ the n-gram language model + similarity features
-│   ├── preprocess.py               ⬜ builds the 3 input formats
+│   ├── features.py                 ✅ the n-gram language model + similarity features
+│   ├── preprocess.py               ✅ builds the 3 input formats
 │   ├── train_classical.py          ⬜ M1, M2, M11, M12
 │   ├── train_neural.py             ⬜ M3, M13
 │   ├── train_transformer.py        ⬜ M4, M5
 │   ├── further_pretrain.py         ⬜ M6
-│   └── evaluate.py                 ⬜ scoring, breakdowns, word-order test, significance tests
+│   └── evaluate.py                 ✅ scoring, breakdowns, word-order test, significance tests
 ├── tests/
 │   └── test_text_bn.py             ✅ one test per text rule — python -m pytest tests/
 ├── notebooks/
@@ -432,7 +432,29 @@ Use it consistently at both training and prediction time, and note in your log w
 
 F3 frames the task like "does this passage support this answer?" — close to what pretrained language-understanding models are already good at.
 
-**Truncation matters a lot here.** Passages have a typical length of 266 characters but can run up to 3,132. If you cut the input at 256 tokens and the part of the passage that actually answers the question gets cut off, you're training on noise. **Always cut the passage, never the question or the answer.**
+**Truncation matters a lot here.** If you cut the input at 256 tokens and the part of the passage that actually answers the question gets cut off, you're training on noise. **Always cut the passage, never the question or the answer.**
+
+**Built and measured** (`src/preprocess.py`, checked on all 7,372 train+dev records):
+
+| Budget | Has-context records needing a cut | Pairs whose evidence is lost |
+|---|---|---|
+| 512 tokens | 0.1% | — |
+| **256 (the default)** | **1.5%** | **7 of 1,634 (0.4%)** |
+| 128 tokens | 20.4% | 117 of 1,634 (7.2%) |
+
+("Evidence lost" is measured on the pairs whose correct answer is a literal span of their passage, so its position can be located.)
+
+So the passage is simply cut from the end, and nothing cleverer. Keeping the window that best matches the **question** was tried and rescues only 2 of those 7 — not worth the machinery. Keeping the window that best matches the **answer** would rescue more and is **forbidden**: it would hand the model the evidence for correct answers only, which is the string-matching shortcut all over again.
+
+Typical finished sizes: F1 median 14 tokens, F2 median 34 (p99 246), F3 median 37.
+
+```python
+from preprocess import as_tokens, format_record
+as_tokens(record, "F2")        # for the classical and recurrent models
+format_record(record, "F3")    # ModelInput(text_a=passage, text_b=question + answer)
+```
+
+For a pretrained encoder, pass F3's two segments to the tokenizer with `truncation="only_first"` so it can only ever shorten the passage. Its sub-word tokenizer counts more tokens than ours does on Bengali, so for F1/F2 pass that tokenizer's length function into `record_parts(..., length_fn=...)` to pre-cut exactly.
 
 ---
 
@@ -481,7 +503,16 @@ P(next_char | history) = (count(history, next_char) + 1) / (count(history) + alp
 score(text) = average of log P(each character | its history)
 ```
 
-Try n = 2, 3, or 4 and pick the best on dev (start with 3).
+**Settings, as measured (`python src/features.py --tune-lm`).** History length and smoothing were chosen by AUC on the **train** hard subset, then confirmed on dev:
+
+| History length | Smoothing k | train hard AUC | dev hard AUC | |
+|---|---|---|---|---|
+| 3 | 1.0 (plain Laplace) | 0.606 | 0.640 | the lab's own settings |
+| 3 | 0.1 | 0.605 | 0.641 | |
+| 4 | 1.0 | 0.603 | 0.640 | |
+| **4** | **0.1** | **0.611** | **0.657** | **in use** |
+
+Laplace (add 1) turned out too blunt here: with about 60 different characters, a character the passage *has* seen scores only twice one it has never seen, so a copied answer and an invented one look nearly alike. Adding 0.1 instead sharpens that contrast. Add-k is the standard generalisation of the lab's add-1.
 
 | How it's used | What it does | What comes out |
 |---|---|---|
@@ -505,11 +536,41 @@ Every one of these features compares a record **to itself** — never to any oth
 | `has_context` | Just 1 or 0 — whether there's a passage at all | — |
 | `answer_len`, `digit_share` | Answer length, and share of characters that are digits | — |
 
-Normalised edit distance = edit distance ÷ the longer of the two texts' lengths. Implement it exactly like the lab's DP function; for speed on long passages, use `rapidfuzz.distance.Levenshtein`, but first check on 500 random pairs that it gives identical answers to the lab's own version.
+**How `edit_passage` is actually computed (built, and better than the sketch above).** Comparing the answer against every window of a 3,127-character passage would take billions of steps. Instead `best_match_distance()` uses the standard "free start" edit-distance table: the first row is all zeros, so the match may begin anywhere, and one pass finds the closest piece of the passage *of any length*. That is not only faster but more correct — the window version misses a better match that is a little longer or shorter (it returned 5 edits on a real record where the true answer is 4). The distance is divided by the answer's length, which is the most edits it can ever need.
+
+Two checks back this up, both inside `python src/features.py --check`:
+- the plain Lab 1 table agrees with `rapidfuzz` on 500 real answer pairs (0 disagreements);
+- the fast search agrees with brute-force checking of *every* substring, on random small cases.
+
+**One detail the data forced.** 198 train answers end in a Bengali full stop ("আরবি।") where the passage has them without it. So both `exact_in_passage` and `edit_passage` trim a trailing "।" first; before that fix the two features disagreed on exactly those records.
 
 Feed these features (standardised) into a plain `LogisticRegression`. This model has no randomness, so run it once. Look at which feature got the biggest weight — that tells you what kind of similarity the model actually relies on.
 
-**V6 — the "fuzzy" string-matching baseline.** Predict "correct" if `edit_passage` is below some threshold, where the threshold is chosen using the train split only, to get the best possible score there. Report this next to the exact-matching rule (0.823 overall / 0.454 hard, on the cleaned-up data). If a real model beats 0.454 but doesn't beat this fuzzy rule, it hasn't really learned to understand the passage — it's just doing fuzzy matching.
+**V6 — the "fuzzy" string-matching baseline.** Predict "correct" if `edit_passage` is below a threshold, chosen on the train split only. **Measured** (`python src/features.py --baseline`) — and the answer turned out to be two thresholds, not one:
+
+| Tuned on | threshold | dev all | dev easy | dev **hard** |
+|---|---|---|---|---|
+| Exact matcher (no fuzziness) | — | 0.850 | 0.996 | 0.487 |
+| All train has-context records | 0.000 | 0.850 | 0.996 | 0.487 |
+| Train **hard** records only | 0.405 | 0.572 | 0.543 | **0.591** |
+
+Tuning on everything picks a threshold of 0 — it decides fuzziness doesn't pay. That's right *overall*: easy records are already solved by exact matching, so any allowance just lets wrong answers through. But on hard records, where exact matching has nothing to work with, allowing about 40% of the characters to differ lifts the score from 0.487 to **0.591**.
+
+**So the bar on the hard subset is 0.591, not 0.487.** Report the best rule on each row. A model that beats exact matching on hard but not 0.591 has only learned fuzzy string matching. (These are dev numbers, n = 706 has-context and 218 hard; the corpus-wide figures in §3.3 cover different records.)
+
+**What the features are actually worth (dev, from `--check`).** AUC is the chance a feature ranks a random correct answer above a random wrong one; 0.50 is useless. `edit_passage` is a *distance*, so for it low is good and its AUC reads below 0.50.
+
+| Feature | has-context AUC | **hard-subset AUC** |
+|---|---|---|
+| `exact_in_passage` | 0.851 | 0.528 — collapses, exactly as intended |
+| `token_overlap` | 0.774 | 0.613 |
+| `lm_passage` (M11a) | 0.700 | **0.657 — the best single feature on hard** |
+| `edit_passage` | 0.183 (0.817 inverted) | 0.400 (0.600 inverted) |
+| `answer_len` | 0.526 | 0.563 |
+
+This is the justification for M11 and M12 existing: on the hard subset the exact matcher is dead (0.528) while the graded features still carry real signal. The character language model does best there.
+
+**The M11(b) answer-style classifier scores 0.529–0.546 on dev**, next to the answer-only probe's 0.542 — i.e. no better than reading the answer alone. Good news: the wrong answers carry no strong writing fingerprint that a model could exploit instead of checking the facts.
 
 **A quick sanity check on the word vectors (from Lab 3):** before using the Skip-gram vectors for anything, print the 5 nearest words (by cosine similarity) to about 10 common Bengali words (river, king, year, science). If the neighbours look unrelated, the vectors aren't good enough to trust. This is a one-time offline check — it's never used to fetch anything at prediction time.
 
@@ -817,6 +878,27 @@ Report all of these **separately**, never blended together:
 
 Every has-context row must show **both** baselines: the exact string-matching rule, and the fuzzy one (V6).
 
+**Built** (`src/evaluate.py`). Every model reports through `report(records, predictions, scores)`, so no model can be scored on its own terms. Three choices in it are worth knowing:
+
+- **The 95% interval resamples pairs, not records.** The two answers to one question share a passage and a question, so they rise and fall together. Drawing single records would pretend they are independent and make the interval look tighter than it is.
+- **Per-type slices report a detection rate, not macro-F1.** A type slice ("all the `numeric` errors") holds only wrong answers, so macro-F1 on it is degenerate. The table gives the share of that type the model caught, plus a *pair* score that adds the matching correct answers back so it can be compared with the other macro-F1 numbers.
+- **McNemar is written out by hand**, because `statsmodels` is not one of this project's dependencies.
+
+There is also an explicit **`has-context + hard`** row, because that is the PRD G4 target and it is *not* the same as the plain "hard" row (which also counts hard no-context records: 0.487 vs 0.440 for the exact rule on dev).
+
+**The human-written vs generated split cannot be reported.** Every record in this corpus is `llm_generated` (`data/SOURCES.md`), so there is no human-written slice to compare against. `report()` prints that instead of leaving a silent gap.
+
+**Table 5 measured on dev** (`python src/evaluate.py --baselines --table`):
+
+| Rule | overall | has-ctx | no-ctx | easy | hard |
+|---|---|---|---|---|---|
+| Exact string match | 0.678 | 0.850 | 0.333 | 0.767 | 0.440 |
+| Fuzzy string match (V6) | 0.558 | 0.572 | 0.333 | 0.562 | 0.539 |
+| Always says correct | 0.333 | 0.333 | 0.333 | 0.333 | 0.333 |
+| Always says hallucinated | 0.333 | 0.333 | 0.333 | 0.333 | 0.333 |
+
+The rules score 0.333 on every no-context record, because without a passage they have nothing to check — which is precisely why no-context is the harder half.
+
 ### 12.1a M14 — does word order actually matter to each model?
 
 Lab 3 shows that a bag-of-words model gives "the dog bit the man" and "the man bit the dog" the exact same vector. This test measures what that limitation actually costs us. **Dev only.**
@@ -918,7 +1000,7 @@ Without this, you can't honestly claim model A beats model B if they only differ
 | Week | What happened / what's next |
 |---|---|
 | 1–3 *(done)* | Licences checked, schema frozen, corpus built and filtered, annotation done, human agreement measured, splits locked |
-| **4** *(next)* | Build `text_bn.py`; train M1, M11, M2, M12; measure the V6 baseline; build `evaluate.py`; run the M10 cleanup experiment |
+| **4** *(under way)* | ✅ `text_bn.py`, `features.py` (M11/M12 + V6 baseline), `preprocess.py`, `evaluate.py`. ⬜ Still to train: M1, M2, and the M10 cleanup experiment |
 | **5** | Build M3 (recurrent models) and M13 (Transformer from scratch); start the first pretrained models (M4/M5); sweep input formats (M9) |
 | **6** | Further pretraining; combining models; threshold tuning; AI reference point; the word-order test (M14); final safety check; produce all 8 result tables |
 
@@ -965,11 +1047,11 @@ The full list of what's used and what's skipped, with reasons, is in PRD §5.3b.
 | 1 | `word_tokenize` | `text_bn.py` → `tokenize()` (§6) | A regex tokenizer for Bengali; the Bengali full stop is its own token |
 | 1 | English stop words | `configs/bn_stopwords.txt` (M10 only) | A published Bengali list; negation and number words protected via `bn_protected_words.txt` |
 | 1 | Porter Stemmer | `text_bn.py` → `stem_word()` (M10 only) | Bengali noun endings; the stem must be a real train word; never touches negation |
-| 1 | Edit-distance calculation | `features.py` (M12, V6) | Normalised; checks the best-matching window of the passage |
+| 1 | Edit-distance calculation | `features.py` (M12, V6) | Normalised; "free start" table finds the closest piece of the passage |
 | 2 | Bag of Words, TF-IDF | `train_classical.py` (M1) | One vectorizer per record part (passage/question/answer) |
-| 2 | N-gram language model | `features.py` (M11) | Character-level; Laplace smoothing; used to *score*, not generate |
+| 2 | N-gram language model | `features.py` (M11) | Character-level; add-k smoothing (k tuned on train); used to *score*, not generate |
 | 3 | Skip-gram from scratch | gensim's Word2Vec (M2) | Trained on the train split; sanity-checked with nearest neighbours |
-| 3 | Cosine similarity | `features.py` (M12) | Only compares an answer to its own passage/question |
+| 3 | Cosine similarity | `features.py` (M12) | Only compares an answer to its own passage/question — added once Skip-gram (M2) exists |
 | 3 | Naive Bayes, Logistic Regression (hand-written) | Library versions (M1, M2, M12) | Checked against the hand-written version on a sample |
 | 3 | Averaging / TF-IDF-weighting embeddings | (M2) | Same idea, unchanged |
 | 3 | "Dog bit the man" word-order test | `evaluate.py` (M14) | Run on every trained model, reported per error type |

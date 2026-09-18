@@ -22,7 +22,7 @@ Read this table first. It tells you what is done and what is next, without diggi
 | Annotation pilot | Testing that two humans agree on labels | ✅ Done — agreement score 0.717 |
 | Full annotation | Humans checking every test/dev item and a slice of train | ✅ Done — agreement score 0.865 on test |
 | Merge + cleanup | Writing human labels into the corpus, removing 180 bad pairs | ✅ Done |
-| **Model ladder** | **Training and testing all the required models** | 🔶 **In progress** — step 1 of 11 done: Bengali text tools (`src/text_bn.py`). Next: `src/features.py` |
+| **Model ladder** | **Training and testing all the required models** | 🔶 **In progress** — 4 of 11 steps done: Bengali text tools, the hand-made features + V6 baseline, the three input formats, and the scoring code. Next: the first models (`src/train_classical.py`) |
 | Final evaluation | Scoring the locked test set exactly once | ⬜ Not started |
 
 **In one sentence: the dataset is finished and verified. Model building has started (text tools done); the models themselves come next.**
@@ -404,7 +404,7 @@ The lab code was written for English. If you copy it exactly onto Bengali text, 
 | V3 | A model given only the answer text should score clearly worse than a model given everything | ⬜ Needs a trained model |
 | V4 | Every has-context score must be shown next to the string-matching baseline | ⬜ To enforce once models exist |
 | V5 | Any score above 0.95 on has-context data triggers an investigation for a data leak | ⬜ |
-| V6 | A "fuzzy" string-matching baseline (allows small spelling differences) must be shown next to the exact one | ⬜ To measure once models exist |
+| V6 | A "fuzzy" string-matching baseline (allows small spelling differences) must be shown next to the exact one | ✅ Measured 2026-09-19: dev has-context 0.850, **hard 0.591** (exact rule gets 0.487 on the same records). The hard-subset bar is 0.591 |
 
 **V1 is a hard stop.** If you're ever tempted to lower the 0.60 threshold, change which features it looks at, or reshuffle the split just to make it pass — don't. That single move would be the most damaging thing anyone could do to this project.
 

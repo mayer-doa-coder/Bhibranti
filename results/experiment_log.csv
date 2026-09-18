@@ -15,3 +15,7 @@ corpus_007,2026-09-17,shortcut_probe_metadata,candidate_answer_only,none,42,,,,c
 corpus_008,2026-09-17,context_substring_rule,rule_based,none,42,,,,corpus/bn_v1_usable,,0.823,"BASELINE TO BEAT on usable data: has-context ALL (n=5092). Replaces 0.812 as the reference"
 corpus_009,2026-09-17,context_substring_rule_easy,rule_based,none,42,,,,corpus/bn_v1_usable,,0.987,"usable data, EASY subset (n=3398)"
 corpus_010,2026-09-17,context_substring_rule_hard,rule_based,none,42,,,,corpus/bn_v1_usable,,0.454,"usable data, HARD subset (n=1694) - THE meaningful target. Replaces 0.456"
+baseline_001,2026-09-19,fuzzy_substring_rule_all,rule_based,text_bn_V1,42,,,,dev_usable,0.850,,"V6 fuzzy matcher, edit_passage <= 0.000 (tuned on all train has-context); has-context all (n=706); exact rule scores 0.850 on the same records"
+baseline_002,2026-09-19,fuzzy_substring_rule_easy,rule_based,text_bn_V1,42,,,,dev_usable,0.996,,"V6 fuzzy matcher, edit_passage <= 0.000 (tuned on all train has-context); has-context easy (n=488); exact rule scores 0.996 on the same records"
+baseline_003,2026-09-19,fuzzy_substring_rule_hard,rule_based,text_bn_V1,42,,,,dev_usable,0.487,,"V6 fuzzy matcher, edit_passage <= 0.000 (tuned on all train has-context); has-context hard (n=218); exact rule scores 0.487 on the same records"
+baseline_004,2026-09-19,fuzzy_substring_rule_hard,rule_based,text_bn_V1,42,,,,dev_usable,0.591,,"V6 fuzzy matcher, edit_passage <= 0.405 (tuned on train HARD only); has-context hard (n=218); exact rule scores 0.487 on the same records"

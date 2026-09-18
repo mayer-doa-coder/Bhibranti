@@ -61,7 +61,27 @@ dev 619 / 1,238 · test 614 / 1,228.
 - [x] **M4 step 1 — `src/text_bn.py`** (Lab 1): Bengali cleaning, tokenizer, stop words, stemmer.
       Protected negation + number words (`configs/bn_protected_words.txt`); stemmer only cuts if
       the stem is a real train word. `--check` passes 9 rules on train+dev; 27 tests pass.
-- [ ] Model ladder: next is `src/features.py` (M11 n-gram LM, M12 similarity features)
+- [x] **M4 step 2 - `src/features.py`** (Labs 1-3): char n-gram LM (M11) + similarity features (M12).
+      Settings tuned on TRAIN hard AUC: order 4, add-k k=0.1. **V6 measured**: fuzzy rule on dev
+      hard = **0.591** (exact rule 0.487) - the hard-subset bar is 0.591, not 0.487.
+      On hard, `lm_passage` is the best single feature (AUC 0.657); `exact_in_passage` collapses
+      to 0.528. M11b answer-style classifier 0.529-0.546 ~= answer-only probe 0.542 (no
+      generator fingerprint). 24 tests pass.
+- [x] **M4 step 3 - `src/preprocess.py`** (guide §6, M9): the three input formats F1/F2/F3.
+      Cuts the PASSAGE only, never the question or answer - verified on all 7,372 train+dev
+      records. At the 256-token budget only 1.5% of has-context records need cutting, and
+      measured evidence loss is 7 of 1,634 locatable pairs (0.4%); at 128 tokens it is 7.2%.
+      Choosing the passage window by ANSWER overlap is forbidden (it would leak). 22 tests pass.
+- [x] **M4 step 4 - `src/evaluate.py`** (guide §12): every model is scored here, so none can be
+      judged on its own terms. macro-F1 + accuracy + per-class P/R + AUC, sliced by condition,
+      difficulty, subject and error type, with the rule baselines recomputed on the same
+      records. Three deliberate choices: the 95% interval resamples PAIRS (the two answers to
+      one question are not independent); per-type slices report DETECTION RATE plus a
+      pair-level score (a type slice holds only wrong answers, so macro-F1 there is
+      degenerate); McNemar is written out because statsmodels is not a dependency. Adds an
+      explicit `has-context + hard` row - the PRD G4 target. `--split test` refuses without
+      `--final`. 28 tests pass.
+- [ ] Model ladder: next is `src/train_classical.py` (M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram)
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
 knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
@@ -78,6 +98,7 @@ data (excluded pairs removed), because that is what models train and are scored 
 | String matcher, all has-context | **0.823** | "Does the answer appear in the passage?" — no learning at all |
 | String matcher, easy subset | 0.987 | where the shortcut fully works |
 | String matcher, **hard subset** | **0.454** | on hard pairs the shortcut is useless |
+| **Fuzzy** matcher, **hard subset** (V6) | **0.591** on dev hard | allows ~40% of characters to differ; exact rule gets 0.487 on the same records. **This is the real hard-subset bar** |
 
 (Before exclusion they were 0.812 / 0.980 / 0.456. For a dev or test score, recompute the baseline
 on that same split.) A has-context macro-F1 of 0.83 is **not** a result — it barely beats a string
@@ -122,8 +143,23 @@ python src/text_bn.py "কলেজের ছাত্ররা বইটি প
 python src/text_bn.py --check                         # 9 safety rules on train+dev (exit 1 on failure)
 python -m pytest tests/ -v                            # unit tests, one per rule
 
+# M4 step 2 - hand-made features + the V6 baseline (Labs 1-3)
+python src/features.py --demo        # features side by side for a correct vs wrong answer
+python src/features.py --check       # sanity rules + how much signal each feature carries
+python src/features.py --baseline    # tune + score the V6 fuzzy rule (add --log to record it)
+python src/features.py --tune-lm     # redo the language-model order/smoothing table
+
+# M4 step 3 - the three input formats (guide §6). Passage is cut; question/answer never are
+python src/preprocess.py --demo                       # one record in all three formats
+python src/preprocess.py --check                      # the guarantees, on train+dev
+python src/preprocess.py --format F3 --split dev --out data/processed/
+
+# M4 step 4 - scoring. Every model reports through this, so the numbers stay comparable
+python src/evaluate.py --demo                   # what the numbers mean, on made-up models
+python src/evaluate.py --baselines --table      # score the no-learning rules -> results/tables/
+python src/evaluate.py --baselines --split test --final   # ONLY at M6, once, ever
+
 # Not yet written (M4-M6) - see guide §1.3 for the planned modules
-python src/preprocess.py --format F3 --in data/splits/ --out data/processed/
 python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
 python src/train_classical.py    --model tfidf_nb --variant V2       # M10 preprocessing ablation
 python src/train_neural.py       --model bilstm_attn --seed 42       # M3 (Lab 4)
@@ -158,13 +194,16 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/text_bn.py` | ✅ Bengali cleaning, tokenizer, stop words, stemmer (Lab 1). Use `preprocess(text, variant)` |
 | `configs/bn_stopwords.txt` · `bn_protected_words.txt` · `bn_suffixes.txt` | ✅ Word lists for `text_bn.py`. Edit the protected list, never the published stop list |
 | `tests/test_text_bn.py` | ✅ One test per text rule — run after any change to `text_bn.py` or the word lists |
-| `src/features.py` | ⬜ M11 char n-gram LM, M12 edit distance + cosine features (Labs 1–3) |
-| `src/preprocess.py` | ⬜ Input formats F1/F2/F3 |
+| `src/features.py` | ✅ M11 char n-gram LM, M12 edit distance features, V6 fuzzy baseline (Labs 1–3). `extract_features(record)` |
+| `tests/test_features.py` | ✅ One test per feature rule — run after any change to `features.py` |
+| `src/preprocess.py` | ✅ Input formats F1/F2/F3. `as_tokens()` for classical models, `format_record()` for encoders. Cuts the passage only |
+| `tests/test_preprocess.py` | ✅ One test per formatting rule |
 | `src/train_classical.py` | ⬜ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3) |
 | `src/train_neural.py` | ⬜ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5) |
 | `src/train_transformer.py` | ⬜ Pretrained encoder fine-tuning (M4/M5) |
 | `src/further_pretrain.py` | ⬜ MLM further pretraining (mBERT / XLM-R only) |
-| `src/evaluate.py` | ⬜ Metrics, breakdowns, M14 word-order test, McNemar, bootstrap CI |
+| `src/evaluate.py` | ✅ Metrics, breakdowns, baselines, M14 shuffling, McNemar, pair-level bootstrap. `report(records, predictions)` |
+| `tests/test_evaluate.py` | ✅ One test per scoring rule, checked against hand-worked values |
 | `NLP Lab/` | Course lab guides + notebooks — the syllabus the ladder follows. Read-only |
 | `data/DATASET_AUDIT.md` | **Read first.** Audit of the source pool |
 | `data/corpus/bn_v1/corpus.jsonl` | ✅ The Phase 1 corpus, 4,480 pairs |
