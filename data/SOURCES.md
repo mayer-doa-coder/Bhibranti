@@ -120,6 +120,13 @@ separable.
 | `xlm-roberta-base`, `bert-base-multilingual-cased` | MIT / Apache 2.0 |
 | `ai4bharat/IndicBERTv2-MLM-only` | check model card |
 
+## Language resources
+
+| Resource | Where it is used | Source | Licence |
+|---|---|---|---|
+| Bengali stop-word list, 398 entries, copied unchanged | `configs/bn_stopwords.txt` — M10 ablation only (`src/text_bn.py`) | stopwords-iso, "bn" list, Python package `stopwordsiso` 0.7.1 (github.com/stopwords-iso/stopwords-iso), downloaded 2026-09-17 | MIT |
+| Protected words, suffix list | `configs/bn_protected_words.txt`, `configs/bn_suffixes.txt` | written for this project | project licence |
+
 ---
 
 ## Open actions

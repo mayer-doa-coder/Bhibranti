@@ -1,0 +1,53 @@
+# Word endings the M10 Bengali stemmer may cut off.
+#
+# HOW THE STEMMER USES THIS LIST (see stem_word() in src/text_bn.py):
+#   1. Endings are tried LONGEST FIRST, so "গুলোকে" is tried before "কে".
+#   2. At most ONE ending is cut from a word.
+#   3. The cut only happens if what is left
+#        a) has at least MIN_STEM_LENGTH characters ("ধারা" is not cut to "ধা"), and
+#        b) is a real word seen in the train text ("শব্দের" is not cut at "দের" into
+#           the non-word "শব্"; it is cut at "ের" into "শব্দ" instead).
+#   4. Protected words and words ending in a negation (নি / না) are never cut.
+#
+# WHAT IS IN THIS LIST: noun endings only - plural markers, "the" markers, and
+# case endings ("of", "to", "in"). Examples:
+#   কলেজের -> কলেজ     ছাত্ররা -> ছাত্র     বইগুলো -> বই     কলমটি -> কলম
+#
+# WHAT IS DELIBERATELY NOT IN THIS LIST:
+#   - Single characters such as "র" or "ে": they are also the last letter of many
+#     root words, e.g. "সরকার" would wrongly become "সরকা".
+#   - Verb endings (-েছিলেন, -েছে, -বে ...): tense can BE the error
+#     ("হয়েছে" happened vs "হবে" will happen), so verbs are left whole.
+#   - Endings that finish in না or নি (e.g. "খানা", "খানি"): words ending that
+#     way are skipped anyway, to protect negation such as "করেননি".
+#
+# HOW TO CHANGE: one ending per line, then rerun  python src/text_bn.py --check
+# Lines starting with # are comments. Blank lines are ignored.
+
+# ---- plural endings ----
+গুলোকে
+গুলোতে
+গুলোর
+গুলো
+গুলিকে
+গুলিতে
+গুলির
+গুলি
+দেরকে
+দের
+েরা
+রা
+
+# ---- "the" markers (classifiers) ----
+টিকে
+টির
+টি
+টাকে
+টার
+টা
+
+# ---- case endings ----
+ের
+এর
+কে
+তে

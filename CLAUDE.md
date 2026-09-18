@@ -58,7 +58,10 @@ dev 619 / 1,238 · test 614 / 1,228.
       files marked `excluded = true`; `src/splits.py` drops them. Gate on usable data: 0.514.
 - [x] **Label disputes recorded, not applied:** 222 records where a human disagrees with the
       corpus label (116 unanimous) → `data/annotated/round1/label_disputes.csv`.
-- [ ] Model ladder not built yet
+- [x] **M4 step 1 — `src/text_bn.py`** (Lab 1): Bengali cleaning, tokenizer, stop words, stemmer.
+      Protected negation + number words (`configs/bn_protected_words.txt`); stemmer only cuts if
+      the stem is a real train word. `--check` passes 9 rules on train+dev; 27 tests pass.
+- [ ] Model ladder: next is `src/features.py` (M11 n-gram LM, M12 similarity features)
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
 knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
@@ -114,6 +117,11 @@ python src/merge_annotation.py --dry-run     # sheets -> corpus report; drop --d
 # M2 gate — PASSED at kappa 0.717. Rerun any time:
 python src/score_agreement.py \n  --a data/annotated/agreement_test_v1/items_for_annotation_tawhid.csv \n  --b data/annotated/agreement_test_v1/items_for_annotation_shejan.csv
 
+# M4 step 1 - Bengali text tools (Lab 1). Every non-pretrained model uses preprocess() from here
+python src/text_bn.py "কলেজের ছাত্ররা বইটি পড়েনি।"   # show every cleaning step and variant
+python src/text_bn.py --check                         # 9 safety rules on train+dev (exit 1 on failure)
+python -m pytest tests/ -v                            # unit tests, one per rule
+
 # Not yet written (M4-M6) - see guide §1.3 for the planned modules
 python src/preprocess.py --format F3 --in data/splits/ --out data/processed/
 python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
@@ -147,7 +155,9 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/splits.py` | ✅ `load_split("train")` — **the only way to load data for training or scoring**; drops excluded pairs |
 | [docs/PROJECT_WALKTHROUGH.md](docs/PROJECT_WALKTHROUGH.md) | Beginner-friendly explanation of every step so far — **keep it updated as steps finish** |
 | `src/audit.py` | ✅ Shortcut probes + structural checks |
-| `src/text_bn.py` | ⬜ M10 Bengali cleaning, tokenizer, stop words, stemmer (Lab 1) |
+| `src/text_bn.py` | ✅ Bengali cleaning, tokenizer, stop words, stemmer (Lab 1). Use `preprocess(text, variant)` |
+| `configs/bn_stopwords.txt` · `bn_protected_words.txt` · `bn_suffixes.txt` | ✅ Word lists for `text_bn.py`. Edit the protected list, never the published stop list |
+| `tests/test_text_bn.py` | ✅ One test per text rule — run after any change to `text_bn.py` or the word lists |
 | `src/features.py` | ⬜ M11 char n-gram LM, M12 edit distance + cosine features (Labs 1–3) |
 | `src/preprocess.py` | ⬜ Input formats F1/F2/F3 |
 | `src/train_classical.py` | ⬜ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3) |

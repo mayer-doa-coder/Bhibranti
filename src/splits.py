@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-SPLITS = Path("data/splits")
+SPLITS = Path(__file__).resolve().parents[1] / "data" / "splits"   # works from any folder
 
 
 def load_split(split: str, include_excluded: bool = False) -> list[dict]:

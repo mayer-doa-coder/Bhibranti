@@ -108,12 +108,12 @@ we solve.
 | 4 | Build the corpus | ✅ done | **4,480 pairs / 8,960 records** |
 | 5 | Measure difficulty | ✅ done | every pair marked easy or hard |
 | 6 | Split into train / dev / test | ✅ done | 3,129 / 673 / 678 pairs, no overlap |
-| 7 | Shortcut audit (the gate) | ✅ passing | metadata probe **0.534** (must be < 0.60) |
+| 7 | Shortcut audit (the gate) (a cheap trick (like just checking answer length) could guess the correct answer without real understanding) | ✅ passing | metadata probe **0.534** (must be < 0.60) |
 | 8 | Guidelines + 100-item agreement test | ✅ passed | Cohen's κ **0.717** (must be ≥ 0.60) |
 | 9 | Full human annotation | ✅ done | 5,310 rows; test κ **0.865** |
-| 10 | Merge annotation into the corpus | ✅ done | 253 rows adjudicated; D8 met; strict audit passes |
+| 10 | Merge annotation into the corpus | ✅ done | 253 rows adjudicated (a disagreement got a final decision from a third look); D8 met; strict audit passes |
 | 10b | Leave out human-flagged pairs (PRD Q5) | ✅ done | 180 pairs excluded; usable: 3,067 / 619 / 614 pairs |
-| 11 | **Model ladder (N-gram → … → BERT)** | 🔶 **next** | — |
+| 11 | **Model ladder (N-gram → … → BERT)** | 🔶 **in progress** | step 1 done: Bengali text tools (§18.3) |
 | 12 | Final test evaluation (once only) | ⬜ not started | — |
 
 In the project requirements document ([PRD.md](PRD.md)) these are milestones **M0** (steps 0–3),
@@ -1077,3 +1077,40 @@ model that only learned approximate string matching cannot pass as a real detect
 
 When each of these finishes, add its section here in the same What / Why / How / Result / Checked
 format.
+
+### 18.3 Step 11.1 (done) — Bengali text tools, `src/text_bn.py` (Lab 1)
+
+**What.** One file that turns raw Bengali text into the list of words a model receives. Every model
+that isn't a pretrained BERT uses it, through one call: `preprocess(text, variant)`.
+
+**How — four cleaning steps, then splitting into words:**
+
+| Step | Example | Why |
+|---|---|---|
+| 1. One spelling per letter (Unicode NFC) | য় stored two ways → one way | otherwise the same word can fail to match |
+| 2. Remove footnote marks | `হয়।[1][২]` → `হয়।` | Wikipedia leftovers, 3,598 in train+dev |
+| 3. One style of digit | `১৭০৪` → `1704` | same value, same word |
+| 4. Tidy spaces | newlines, double spaces → one space | 208 passages had them |
+| Split into words | `স্বাধীন হয়।` → `স্বাধীন` `হয়` `।` | the দাঁড়ি becomes its own token |
+
+**The two Lab 1 ideas that needed care in Bengali:**
+
+- **Stop words.** We use a published list (stopwords-iso, 398 words), copied unchanged. It contains
+  **না, নয়** (not) and **একটি, দুটি, প্রথম** (one, two, first). Removing those would make
+  "divided" and "not divided" look the same, and "one" and "two" look the same — exactly the errors
+  we're detecting. So a second file, `configs/bn_protected_words.txt`, lists words the code never
+  removes. Without that protection, 5,033 such words would vanish from train+dev.
+- **Stemming** (cutting endings: কলেজের → কলেজ). A plain rule broke words: "শব্দের" (of the word)
+  was cut into the non-word "শব্". The fix is one easy rule: **only cut if what's left is a real word
+  seen in the training text.** Words ending in না/নি (not) are never cut.
+
+**Why stop words and stemming are *off* by default.** Even the protected version removes some useful
+words, such as "শুরু" (start). Whether they help or hurt is measured in the M10 experiment, not
+assumed.
+
+**Checked.** `python src/text_bn.py --check` runs 9 rules over all 19,118 train+dev texts — no digit,
+Bengali letter, LaTeX `[7]`, negation or number word is ever lost. All pass. `python -m pytest tests/`
+runs 27 small tests, one per rule. The test split was not read.
+
+**To change something** (e.g. a teacher asks to keep "শুরু" too): add the word to
+`configs/bn_protected_words.txt`, then rerun the two commands above.

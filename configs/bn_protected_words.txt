@@ -1,0 +1,48 @@
+# Protected words - src/text_bn.py NEVER removes or stems these.
+#
+# WHY: the stop-word list (configs/bn_stopwords.txt) treats these as "unimportant
+# common words", but in this project they carry the error itself:
+#   - negation words make contradiction errors:  "বিভক্ত" (divided) -> "বিভক্ত নয়" (not divided)
+#   - number words make numeric errors:           "একটি বড় ..." (one big ...) -> "দুটি বড় ..." (two big ...)
+# Removing them would make those two answers look identical to a model.
+#
+# HOW TO CHANGE: add or delete one word per line, then rerun
+#     python src/text_bn.py --check
+# Lines starting with # are comments. Blank lines are ignored.
+# Spelling form does not matter (the code applies Unicode NFC to this file too).
+
+# ---- Negation words ("not", "no", "without") ----
+না
+নয়
+নি
+নেই
+নাই
+নহে
+ছাড়া
+বিনা
+হয়নি
+
+# ---- Number words (exact counts and positions) ----
+# (নয় also means "nine"; it is already listed above)
+এক
+একটি
+এক্
+দু
+দুই
+দুটি
+দুটো
+তিন
+চার
+পাঁচ
+পাচ
+ছয়
+সাত
+আট
+দশ
+শত
+হাজার
+লক্ষ
+কোটি
+প্রথম
+দ্বিতীয়
+তৃতীয়

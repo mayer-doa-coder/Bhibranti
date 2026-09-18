@@ -148,7 +148,7 @@ project/
 |   |-- score_test_agreement.py            OK   Cohen's kappa on the full test split
 |   |-- merge_annotation.py                OK   human sheets -> types + `excluded` flags
 |   |-- splits.py                          OK   load_split() - the only data loader
-|   |-- text_bn.py                         TODO M10 Bengali cleaning/tokenizer/stop words/stemmer (Lab 1)
+|   |-- text_bn.py                         OK   Bengali cleaning/tokenizer/stop words/stemmer (Lab 1); --check
 |   |-- features.py                        TODO M11 char n-gram LM, M12 edit distance + cosine (Labs 1-3)
 |   |-- preprocess.py                      TODO input formats F1/F2/F3
 |   |-- train_classical.py                 TODO M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram, M11, M12 (Labs 2-3)
