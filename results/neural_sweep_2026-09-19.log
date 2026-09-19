@@ -1,0 +1,49 @@
+  rnn seed 42 ...
+    macro-F1 0.547  hard 0.591  epochs 5  (38s)
+  rnn seed 1337 ...
+    macro-F1 0.565  hard 0.612  epochs 5  (40s)
+  rnn seed 2024 ...
+    macro-F1 0.567  hard 0.613  epochs 4  (34s)
+  birnn seed 42 ...
+    macro-F1 0.554  hard 0.591  epochs 5  (72s)
+  birnn seed 1337 ...
+    macro-F1 0.551  hard 0.556  epochs 5  (75s)
+  birnn seed 2024 ...
+    macro-F1 0.553  hard 0.601  epochs 5  (63s)
+  bilstm seed 42 ...
+    macro-F1 0.555  hard 0.604  epochs 5  (371s)
+  bilstm seed 1337 ...
+    macro-F1 0.553  hard 0.566  epochs 5  (344s)
+  bilstm seed 2024 ...
+    macro-F1 0.546  hard 0.584  epochs 5  (393s)
+  bilstm_attn seed 42 ...
+    macro-F1 0.548  hard 0.588  epochs 5  (145s)
+  bilstm_attn seed 1337 ...
+    macro-F1 0.556  hard 0.601  epochs 5  (159s)
+  bilstm_attn seed 2024 ...
+    macro-F1 0.550  hard 0.605  epochs 5  (157s)
+  transformer_scratch seed 42 ...
+    macro-F1 0.528  hard 0.504  epochs 7  (390s)
+  transformer_scratch seed 1337 ...
+    macro-F1 0.504  hard 0.456  epochs 6  (330s)
+  transformer_scratch seed 2024 ...
+    macro-F1 0.364  hard 0.339  epochs 4  (450s)
+
+==========================================================================================
+THE NEURAL MODELS on dev  (F2, V1)
+==========================================================================================
+  model                   lab  dev macro-F1  has-ctx + hard  seeds  epochs
+  --------------------------------------------------------------------------------
+  transformer_scratch     M13    0.465 ±0.072           0.433      3     5.7  (found no signal)
+  bilstm                   M3    0.551 ±0.004           0.585      3     5.0
+  bilstm_attn              M3    0.552 ±0.003           0.598      3     5.0
+  birnn                    M3    0.553 ±0.001           0.583      3     5.0
+  rnn                      M3    0.560 ±0.009           0.605      3     4.7
+
+  The bars they have to clear, on the same dev records:
+    has-context         exact string match 0.850   fuzzy string match 0.572   always says correct 0.333
+    has-context + hard  exact string match 0.487   fuzzy string match 0.591   always says correct 0.333
+
+  Expected: near the classical models (0.50-0.65), and well below the pretrained
+  encoders still to come. That gap is the finding, not something to tune away.
+==========================================================================================
