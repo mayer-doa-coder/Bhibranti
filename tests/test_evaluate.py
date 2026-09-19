@@ -246,3 +246,87 @@ def test_a_results_table_can_be_written(tmp_path):
     ev.TABLES_DIR = tmp_path
     path = write_table([{"model": "x", "macro_f1": 0.5}], "t.csv")
     assert path.exists() and "macro_f1" in path.read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------- the experiment log ---
+
+def test_the_log_is_created_with_its_header_if_it_is_missing(tmp_path):
+    """A finished training run must not be lost to a missing folder.
+
+    This is the last thing a run does, after the model is already trained, so a crash
+    here throws away the whole run.
+    """
+    import csv
+    import evaluate as ev
+    original = ev.LOG_FILE
+    try:
+        ev.LOG_FILE = tmp_path / "results" / "experiment_log.csv"   # folder does not exist
+        path = ev.ensure_log_file()
+        assert path.exists()
+        assert next(csv.reader(path.open(encoding="utf-8"))) == ev.LOG_HEADER
+    finally:
+        ev.LOG_FILE = original
+
+
+def test_an_existing_log_is_never_overwritten(tmp_path):
+    import evaluate as ev
+    original = ev.LOG_FILE
+    try:
+        ev.LOG_FILE = tmp_path / "experiment_log.csv"
+        ev.LOG_FILE.write_text("run_id,date\nkeep_me,2026-09-19\n", encoding="utf-8")
+        ev.ensure_log_file()
+        assert "keep_me" in ev.LOG_FILE.read_text(encoding="utf-8")
+    finally:
+        ev.LOG_FILE = original
+
+
+def test_the_header_matches_the_real_log_on_disk():
+    """If someone adds a column to the log by hand, ensure_log_file() would write a
+    different header on the next fresh clone. This catches that drift."""
+    import csv
+    import evaluate as ev
+    if ev.LOG_FILE.exists():
+        header = next(csv.reader(ev.LOG_FILE.open(encoding="utf-8")))
+        assert header == ev.LOG_HEADER, "results/experiment_log.csv and LOG_HEADER disagree"
+
+
+def test_an_empty_results_table_is_refused_with_a_clear_message():
+    """It used to raise a bare IndexError from rows[0], at the end of a long run, with
+    nothing in the message pointing at the real cause."""
+    import evaluate as ev
+    try:
+        ev.write_table([], "should_never_be_written.csv")
+    except ValueError as e:
+        assert "empty" in str(e).lower()
+        assert not (ev.TABLES_DIR / "should_never_be_written.csv").exists()
+        return
+    raise AssertionError("writing an empty table must be refused")
+
+
+def test_the_log_is_read_and_written_through_one_path(tmp_path):
+    """log_run resolves the path once and uses it for both the duplicate-id check and the
+    append. Reading one file and appending to another is how duplicate run ids appear."""
+    import csv
+    import evaluate as ev
+    import train_classical as tc
+
+    original = ev.LOG_FILE
+    try:
+        ev.LOG_FILE = tmp_path / "experiment_log.csv"
+        result = ev.Result(name="x", n=1, macro_f1=0.5, accuracy=0.5,
+                           correct_class=(0.5, 0.5, 0.5), wrong_class=(0.5, 0.5, 0.5))
+        for _ in range(3):
+            tc.log_run("bow_nb", 42, "F2", "V1", result, 0.5, {})
+        ids = [r["run_id"] for r in csv.DictReader(ev.LOG_FILE.open(encoding="utf-8"))]
+        assert ids == ["m1_bow_nb_F2_V1_s42_1", "m1_bow_nb_F2_V1_s42_2", "m1_bow_nb_F2_V1_s42_3"], ids
+        assert len(ids) == len(set(ids)), "run ids must be unique"
+    finally:
+        ev.LOG_FILE = original
+
+
+def test_no_module_keeps_its_own_copy_of_the_log_path():
+    """A module-level `LOG_FILE = evaluate.LOG_FILE` is bound at import and goes stale."""
+    import features
+    import train_classical
+    assert not hasattr(train_classical, "LOG_FILE")
+    assert not hasattr(features, "LOG_FILE")

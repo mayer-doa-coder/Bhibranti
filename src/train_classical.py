@@ -41,8 +41,8 @@ import csv
 import sys
 import time
 import warnings
+from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
 
 import numpy as np
 from scipy.sparse import csr_matrix, hstack
@@ -56,7 +56,8 @@ from sklearn.svm import LinearSVC
 import evaluate
 from features import AnswerStyleClassifier, feature_matrix, feature_names
 from preprocess import as_tokens, record_parts
-from skipgram import VECTORS_FILE, SkipGram, inverse_document_frequency, train_on_split
+from text_bn import preprocess as tokenise_variant
+from skipgram import SkipGram, inverse_document_frequency, train_on_split, vectors_path
 from splits import load_split
 
 # =============================================================================
@@ -72,7 +73,9 @@ CHAR_NGRAMS = (3, 5)
 # doubles the number of features.
 MIN_DOCUMENT_FREQUENCY = 2
 
-LOG_FILE = Path(__file__).resolve().parents[1] / "results" / "experiment_log.csv"
+# The experiment log lives in evaluate.py and is reached through evaluate.ensure_log_file().
+# No copy of the path is kept here on purpose: a module-level alias is bound at import time
+# and would go stale the moment the real one changed.
 
 
 # =============================================================================
@@ -83,17 +86,19 @@ def parts_as_text(records: list[dict], fmt: str, variant: str) -> dict[str, list
     """The records' three pieces of text, ready for counting.
 
     F1 leaves the passage out, so its block is simply not built.
+
+    Each part is tokenised on its own. It used to be routed through as_tokens(), which is
+    built for ONE flat sequence and therefore inserts a "<SEP>" between the pieces - so
+    every passage column ended "... <SEP> <SEP>" and every question column "... <SEP>".
+    Those markers belong in a flat sequence, not in a column that holds a single part.
     """
     wanted = ["question", "answer"] if fmt == "F1" else ["context", "question", "answer"]
     columns: dict[str, list[str]] = {name: [] for name in wanted}
     for record in records:
         parts = record_parts(record, raw=(variant == "V0"))
+        text_of = {"context": parts.context, "question": parts.question, "answer": parts.answer}
         for name in wanted:
-            columns[name].append(" ".join(
-                as_tokens({"context": parts.context if name == "context" else "",
-                           "question": parts.question if name == "question" else "",
-                           "candidate_answer": parts.answer if name == "answer" else ""},
-                          "F2", variant)))
+            columns[name].append(" ".join(tokenise_variant(text_of[name], variant)))
     return columns
 
 
@@ -196,44 +201,82 @@ MODELS = {
 }
 
 
-def train_and_predict(name: str, train: list[dict], dev: list[dict], seed: int,
-                      fmt: str, variant: str, vectors: SkipGram | None
-                      ) -> tuple[list[int], list[float] | None, dict[str, str]]:
-    """Fit one model on train and predict dev. Returns (predictions, confidence, notes)."""
-    family, representation, learner = MODELS[name]
-    notes: dict[str, str] = {}
+@dataclass
+class FittedModel:
+    """One trained model plus everything needed to turn a NEW record into its numbers.
+
+    Training and serving must not be two different code paths. If the web demo rebuilt the
+    feature pipeline on its own, the two would drift apart the moment either changed, and
+    the demo would quietly show predictions from a model that is not the one in Table 5.
+    So the fitting lives here once, and both `train_and_predict` (which scores dev) and
+    `src/serving.py` (which answers one typed-in record) go through it.
+
+    Everything here was fitted on TRAIN ONLY, which is what makes it safe to apply to
+    anything else.
+    """
+
+    name: str
+    representation: str
+    fmt: str
+    variant: str
+    seed: int
+    classifier: object | None = None            # None for the language-model family
+    features: SparseFeatures | None = None      # word/character counting
+    scaler: StandardScaler | None = None        # M12 only
+    idf: dict[str, float] | None = None         # skipgram_tfidf only
+    style: AnswerStyleClassifier | None = None  # M11b only
+    vectors: SkipGram | None = None
+    notes: dict[str, str] = field(default_factory=dict)
+
+    def matrix(self, records: list[dict]):
+        """The records as numbers, using the pieces fitted on train."""
+        if self.representation in ("bow", "tfidf"):
+            return self.features.transform(parts_as_text(records, self.fmt, self.variant))
+        if self.representation.startswith("skipgram"):
+            return embedding_matrix(records, self.vectors, self.fmt, self.variant, self.idf)
+        x = feature_matrix(records, vectors=self.vectors)    # M12 similarity numbers
+        return self.scaler.transform(x)
+
+    def predict(self, records: list[dict]) -> list[int]:
+        if self.representation == "language_model":
+            return [self.style.predict(r) for r in records]
+        return [int(p) for p in self.classifier.predict(self.matrix(records))]
+
+    def confidence(self, records: list[dict]) -> list[float] | None:
+        if self.representation == "language_model":
+            return [self.style.score_gap(r) for r in records]
+        return confidence(self.classifier, self.matrix(records))
+
+
+def fit_model(name: str, train: list[dict], seed: int, fmt: str, variant: str,
+              vectors: SkipGram | None) -> FittedModel:
+    """Train one model on the train split and hand back everything it needs to be used."""
+    _family, representation, learner = MODELS[name]
+    fitted = FittedModel(name=name, representation=representation, fmt=fmt, variant=variant,
+                         seed=seed, vectors=vectors)
 
     if representation == "language_model":
         # M11(b): one character language model per class - it reads only the answer.
-        model = AnswerStyleClassifier().fit(train)
-        predicted = [model.predict(r) for r in dev]
-        return predicted, [model.score_gap(r) for r in dev], notes
+        fitted.style = AnswerStyleClassifier().fit(train)
+        return fitted
 
     if representation in ("bow", "tfidf"):
-        train_columns = parts_as_text(train, fmt, variant)
-        dev_columns = parts_as_text(dev, fmt, variant)
-        features = SparseFeatures(representation)
-        x_train = features.fit_transform(train_columns)
-        x_dev = features.transform(dev_columns)
-        notes["features"] = f"{features.size:,}"
-        notes["dev OOV"] = f"{out_of_vocabulary_rate(train_columns, dev_columns):.1%}"
+        fitted.features = SparseFeatures(representation)
+        x_train = fitted.features.fit_transform(parts_as_text(train, fmt, variant))
+        fitted.notes["features"] = f"{fitted.features.size:,}"
 
     elif representation.startswith("skipgram"):
         assert vectors is not None
-        idf = None
         if representation.endswith("tfidf"):
-            idf = inverse_document_frequency([as_tokens(r, fmt, variant) for r in train])
-        x_train = embedding_matrix(train, vectors, fmt, variant, idf)
-        x_dev = embedding_matrix(dev, vectors, fmt, variant, idf)
-        notes["vector coverage"] = f"{vectors.coverage([as_tokens(r, fmt, variant) for r in dev]):.1%}"
+            fitted.idf = inverse_document_frequency([as_tokens(r, fmt, variant) for r in train])
+        x_train = embedding_matrix(train, vectors, fmt, variant, fitted.idf)
 
     else:                                                    # M12 similarity numbers
-        x_train = feature_matrix(train, vectors=vectors)
-        x_dev = feature_matrix(dev, vectors=vectors)
-        scaler = StandardScaler().fit(x_train)               # so one big number cannot dominate
-        x_train, x_dev = scaler.transform(x_train), scaler.transform(x_dev)
+        raw = feature_matrix(train, vectors=vectors)
+        fitted.scaler = StandardScaler().fit(raw)            # so one big number cannot dominate
+        x_train = fitted.scaler.transform(raw)
 
-    model = make_classifier(learner, seed)
+    fitted.classifier = make_classifier(learner, seed)
 
     # A learner that ran out of iterations has not finished fitting, so its score is not
     # trustworthy. Raw word counts do this to the SVM (values up to 55, no upper bound),
@@ -241,18 +284,33 @@ def train_and_predict(name: str, train: list[dict], dev: list[dict], seed: int,
     # the number - it is a real result about why scaling matters.
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ConvergenceWarning)
-        model.fit(x_train, [r["label"] for r in train])
+        fitted.classifier.fit(x_train, [r["label"] for r in train])
     if any(issubclass(w.category, ConvergenceWarning) for w in caught):
-        notes["WARNING"] = "did not converge - treat this score as unreliable"
+        fitted.notes["WARNING"] = "did not converge - treat this score as unreliable"
 
-    predicted = [int(p) for p in model.predict(x_dev)]
-
-    if representation == "similarity" and hasattr(model, "coef_"):
-        ranked = sorted(zip(feature_names(vectors), model.coef_[0]),
+    if representation == "similarity" and hasattr(fitted.classifier, "coef_"):
+        ranked = sorted(zip(feature_names(vectors), fitted.classifier.coef_[0]),
                         key=lambda kv: -abs(kv[1]))[:3]
-        notes["leans on"] = ", ".join(f"{n} {w:+.2f}" for n, w in ranked)
+        fitted.notes["leans on"] = ", ".join(f"{n} {w:+.2f}" for n, w in ranked)
 
-    return predicted, confidence(model, x_dev), notes
+    return fitted
+
+
+def train_and_predict(name: str, train: list[dict], dev: list[dict], seed: int,
+                      fmt: str, variant: str, vectors: SkipGram | None
+                      ) -> tuple[list[int], list[float] | None, dict[str, str]]:
+    """Fit one model on train and predict dev. Returns (predictions, confidence, notes)."""
+    fitted = fit_model(name, train, seed, fmt, variant, vectors)
+    notes = dict(fitted.notes)
+
+    # These two describe the DEV set against the fitted model, so they cannot be computed
+    # at fitting time - a served model has no dev set.
+    if fitted.representation in ("bow", "tfidf"):
+        notes["dev OOV"] = f"{out_of_vocabulary_rate(parts_as_text(train, fmt, variant), parts_as_text(dev, fmt, variant)):.1%}"
+    elif fitted.representation.startswith("skipgram"):
+        notes["vector coverage"] = f"{vectors.coverage([as_tokens(r, fmt, variant) for r in dev]):.1%}"
+
+    return fitted.predict(dev), fitted.confidence(dev), notes
 
 
 # =============================================================================
@@ -263,14 +321,21 @@ def log_run(name: str, seed: int, fmt: str, variant: str, result, target: float,
             notes: dict[str, str], note: str = "") -> None:
     """Append one row to the experiment log. A run that is not logged did not happen."""
     family = MODELS[name][0]
-    existing = {row[0] for row in csv.reader(LOG_FILE.open(encoding="utf-8")) if row}
-    run_id = next(f"{family.lower()}_{name}_{fmt}_{variant}_s{seed}_{i}"
-                  for i in range(1, 99)
-                  if f"{family.lower()}_{name}_{fmt}_{variant}_s{seed}_{i}" not in existing)
+    # One path object for both the read and the write. Reading a freshly-resolved path but
+    # writing `LOG_FILE` (bound at import) is two sources of truth: if the log ever moves,
+    # the run ids would be checked against one file and appended to another, which is how
+    # duplicate ids get created.
+    log = evaluate.ensure_log_file()
+    existing = {row[0] for row in csv.reader(log.open(encoding="utf-8")) if row}
+    stem = f"{family.lower()}_{name}_{fmt}_{variant}_s{seed}"
+    attempt = 1
+    while f"{stem}_{attempt}" in existing:        # no upper limit: a long-running project
+        attempt += 1                              # should never crash just for logging
+    run_id = f"{stem}_{attempt}"
     detail = "; ".join(f"{k} {v}" for k, v in notes.items())
     if note:
         detail = f"{note}; {detail}"
-    with LOG_FILE.open("a", encoding="utf-8", newline="") as fh:
+    with log.open("a", encoding="utf-8", newline="") as fh:
         csv.writer(fh).writerow([
             run_id, date.today().isoformat(), f"{family}_{name}", fmt, f"text_bn_{variant}",
             seed, "", "", "", "dev_usable", f"{result.macro_f1:.3f}", "",
@@ -305,17 +370,26 @@ def run_all(seeds: tuple[int, ...], fmt: str, variant: str, write_log: bool,
     for name in MODELS:
         model_seeds = seeds if needs_a_seed(name) else (seeds[0],)
         scores, targets, notes = [], [], {}
+        warnings_seen = {}          # kept across seeds: see below
         for seed in model_seeds:
-            seed_vectors = load_or_train_vectors(seed) if uses_vectors(name) else None
+            seed_vectors = load_or_train_vectors(seed, variant) if uses_vectors(name) else None
             result, target, notes = run_one(name, seed, fmt, variant, seed_vectors, quiet=True)
             scores.append(result.macro_f1)
             targets.append(target)
+            # `notes` is overwritten each seed, so a model that failed to converge on seed 42
+            # but converged on seed 2024 would be reported as clean. Keep every warning.
+            if "WARNING" in notes:
+                warnings_seen[seed] = notes["WARNING"]
             if write_log:
                 log_run(name, seed, fmt, variant, result, target, notes, note)
         mean, spread = evaluate.summarise_seeds(scores)
+        summary = dict(notes)
+        if warnings_seen:
+            summary["WARNING"] = (f"{next(iter(warnings_seen.values()))} "
+                                  f"(seeds {', '.join(str(s) for s in warnings_seen)})")
         rows.append((name, MODELS[name][0], mean, spread, float(np.mean(targets)),
-                     len(model_seeds), dict(notes)))
-        flag = "  <- " + notes["WARNING"] if "WARNING" in notes else ""
+                     len(model_seeds), summary))
+        flag = "  <- " + summary["WARNING"] if "WARNING" in summary else ""
         print(f"  done: {name:<24} dev {mean:.3f}  ({notes.get('trained in', '')}){flag}")
 
     rows.sort(key=lambda row: row[2])
@@ -342,6 +416,93 @@ def run_all(seeds: tuple[int, ...], fmt: str, variant: str, write_log: bool,
     return 0
 
 
+# =============================================================================
+# PART 3b - M10: DOES THE CLASSIC TEXT CLEANUP ACTUALLY HELP? (guide §6)
+# =============================================================================
+
+# The six ways of preparing text, from guide §6. V1 is what everything else uses.
+ABLATION_VARIANTS = ["V0", "V1", "V2", "V3", "V4", "V2-demo"]
+
+# One model per family, chosen by its score on the target (has-context + hard):
+# tfidf_logreg was the joint-best M1 at 0.610, skipgram_mean_xgb the best M2 at 0.529.
+# M3 (the recurrent models) joins this table once it exists.
+ABLATION_MODELS = ["tfidf_logreg", "skipgram_mean_xgb"]
+
+VARIANT_MEANING = {
+    "V0": "no cleaning at all, just split on spaces",
+    "V1": "clean + tokenize (the default)",
+    "V2": "V1 + drop common words (negation kept)",
+    "V3": "V1 + stem",
+    "V4": "V1 + drop common words + stem",
+    "V2-demo": "V2 but negation and numbers dropped too",
+}
+
+
+def run_ablation(seed: int, fmt: str, write_log: bool, write_table: bool) -> int:
+    """Train each model once per variant and lay the scores side by side.
+
+    One seed, not three: the M2 row needs its own word vectors for every variant (three
+    minutes each), and this experiment is about the gap between variants, not about
+    squeezing the last thousandth out of any one of them.
+    """
+    train, dev = load_split("train"), load_split("dev")
+    target_rows = [i for i, r in enumerate(dev) if r["context"] and r["difficulty"] == "hard"]
+    table = []
+
+    for name in ABLATION_MODELS:
+        for variant in ABLATION_VARIANTS:
+            vectors = load_or_train_vectors(seed, variant) if uses_vectors(name) else None
+            started = time.time()
+            predicted, _, notes = train_and_predict(name, train, dev, seed, fmt, variant, vectors)
+
+            overall = evaluate.macro_f1([r["label"] for r in dev], predicted)
+            target = evaluate.macro_f1([dev[i]["label"] for i in target_rows],
+                                       [predicted[i] for i in target_rows])
+            by_type = {kind: score for kind, _, _, score in evaluate.by_error_type(dev, predicted)}
+            row = {"model": name, "variant": variant, "overall": round(overall, 3),
+                   "has_context_hard": round(target, 3),
+                   "contradiction": round(by_type.get("contradiction", float("nan")), 3),
+                   "numeric": round(by_type.get("numeric", float("nan")), 3),
+                   "relational": round(by_type.get("relational", float("nan")), 3),
+                   "features": notes.get("features", notes.get("vector coverage", "")),
+                   "seconds": round(time.time() - started, 1)}
+            table.append(row)
+            # flush: this loop takes the better part of an hour, and without it Python holds
+            # the output in a buffer until the very end, so a working run looks like a hung one.
+            print(f"  done: {name:<22} {variant:<8} overall {overall:.3f}  hard {target:.3f}"
+                  f"  contradiction {row['contradiction']:.3f}", flush=True)
+            if write_log:
+                result = evaluate.evaluate(dev, predicted)
+                log_run(name, seed, fmt, variant, result, target, notes, "M10 ablation")
+
+    print("\n" + "=" * 92)
+    print(f"M10 - DOES THE CLASSIC CLEANUP HELP?  (dev, {fmt}, seed {seed})")
+    print("=" * 92)
+    for name in ABLATION_MODELS:
+        rows = [r for r in table if r["model"] == name]
+        best = max(r["overall"] for r in rows)
+        print(f"\n  {name}")
+        print(f"  {'variant':<10}{'overall':>9}{'hard':>8}{'contradiction':>15}{'numeric':>9}"
+              f"{'relational':>12}   what it does")
+        for row in rows:
+            mark = " *" if row["overall"] == best else "  "
+            print(f"  {row['variant']:<10}{row['overall']:>9.3f}{row['has_context_hard']:>8.3f}"
+                  f"{row['contradiction']:>15.3f}{row['numeric']:>9.3f}{row['relational']:>12.3f}"
+                  f"{mark} {VARIANT_MEANING[row['variant']]}")
+
+    print("\n  How to read this:")
+    print("    * marks the best overall score for that model.")
+    print("    V2-demo is the warning shot: it throws away না/নয় and the number words, so if")
+    print("    the 'contradiction' column drops there, that is the damage this project's")
+    print("    protected-word list exists to prevent.")
+    print("=" * 92)
+
+    if write_table:
+        path = evaluate.write_table(table, "table6_preprocessing_ablation.csv")
+        print(f"  wrote {path}")
+    return 0
+
+
 def needs_a_seed(name: str) -> bool:
     """True when the model has randomness in it, so it must run on all three seeds."""
     return MODELS[name][2] == "xgb" or MODELS[name][1].startswith("skipgram")
@@ -352,18 +513,21 @@ def uses_vectors(name: str) -> bool:
     return MODELS[name][1].startswith("skipgram") or MODELS[name][1] == "similarity"
 
 
-def load_or_train_vectors(seed: int = 42) -> SkipGram:
-    """The word vectors for one seed, trained once and then reused.
+def load_or_train_vectors(seed: int = 42, variant: str = "V1") -> SkipGram:
+    """The word vectors for one seed and one preprocessing variant, cached on disk.
 
-    Skip-gram starts from random numbers, so seed 42 and seed 1337 give different
-    vectors. Reusing one set for all three seeds would hide that variation and make the
-    spread look smaller than it is, so each seed gets its own file.
+    Two reasons this is keyed by BOTH:
+      * Skip-gram starts from random numbers, so seed 42 and seed 1337 give different
+        vectors. Sharing one set across seeds would hide that variation.
+      * The words themselves change with the variant. Stemming turns "কলেজের" into
+        "কলেজ", so vectors learned on unstemmed text would not recognise most of the
+        stemmed ones. The M10 experiment would then be comparing nothing at all.
     """
-    path = VECTORS_FILE.with_name(f"skipgram_s{seed}.npz")
+    path = vectors_path(seed, variant)          # skipgram.py owns the naming, so it cannot drift
     if path.exists():
         return SkipGram.load(path)
-    print(f"  training word vectors for seed {seed} (about 3 minutes)")
-    model = train_on_split(seed=seed, verbose=False)
+    print(f"  training word vectors for {variant}, seed {seed} (about 3 minutes)", flush=True)
+    model = train_on_split(seed=seed, verbose=False, variant=variant)
     model.save(path)
     return model
 
@@ -435,9 +599,19 @@ def main() -> int:
     parser.add_argument("--model", choices=list(MODELS), help="train one model")
     parser.add_argument("--all", action="store_true", help="train every model, side by side")
     parser.add_argument("--lab-check", action="store_true", help="our code vs the library's")
+    parser.add_argument("--ablation", action="store_true",
+                        help="M10: every preprocessing variant, side by side")
+    parser.add_argument("--table", action="store_true", help="write results/tables/*.csv")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--seeds", action="store_true", help="use all three project seeds")
-    parser.add_argument("--format", default="F2", choices=["F1", "F2", "F3"])
+    # F1 and F2 only. F3's entire meaning is "the passage is a separate segment", which a
+    # bag of words and a flat token list cannot represent - as_tokens(F3) is byte-identical
+    # to as_tokens(F2). Accepting it here would let a run be logged as input_format=F3 while
+    # actually being F2, and the M9 format comparison would then report "no difference"
+    # without ever having tried F3. F3 belongs to the pretrained encoders (M4/M5).
+    parser.add_argument("--format", default="F2", choices=["F1", "F2"],
+                        help="F1 = question + answer, F2 = passage + question + answer. "
+                             "F3 is encoder-only (see src/preprocess.py).")
     parser.add_argument("--variant", default="V1",
                         choices=["V0", "V1", "V2", "V3", "V4", "V2-demo"])
     parser.add_argument("--log", action="store_true", help="append to the experiment log")
@@ -448,12 +622,14 @@ def main() -> int:
 
     if args.lab_check:
         return run_lab_check()
+    if args.ablation:
+        return run_ablation(args.seed, args.format, args.log, args.table)
     if args.all:
         return run_all(seeds, args.format, args.variant, args.log, args.note)
     if args.model:
         scores = []
         for seed in (seeds if needs_a_seed(args.model) else (seeds[0],)):
-            vectors = load_or_train_vectors(seed) if uses_vectors(args.model) else None
+            vectors = load_or_train_vectors(seed, args.variant) if uses_vectors(args.model) else None
             result, target, notes = run_one(args.model, seed, args.format, args.variant, vectors)
             scores.append(result.macro_f1)
             if args.log:

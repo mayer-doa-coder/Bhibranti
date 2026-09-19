@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Model scores &mdash; BangHallu{% endblock %}
+{% block nav_models %}here{% endblock %}
+
+{% block content %}
+<div class="layout" style="grid-template-columns: minmax(0,1.75fr) minmax(0,1fr)">
+
+  <!-- ============================ LEFT: the ranking ============================ -->
+  <section>
+    <h2>All {{ rows|length }} models, best first</h2>
+    <div class="grow stretch">
+    <table>
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Model</th>
+          <th class="num">hard</th>
+          <th style="width:110px"></th>
+          <th class="num">overall</th>
+          <th class="num">runs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr {% if loop.first %}class="leader"{% endif %}>
+          <td class="num">{{ row.rank }}</td>
+          <td class="model" title="Looks at: {{ row.sees }}">{{ row.title }}{% if row.unreliable %}<span class="tag">unreliable</span>{% endif %}<span class="why">sees: {{ row.sees }}</span></td>
+          <td class="num">{{ "%.3f"|format(row.hard) if row.hard else "-" }}</td>
+          <td>
+            {% if row.hard %}
+            {# Strictly greater than 0.591, not >=. Bag of Words + Logistic Regression scores
+               exactly 0.591 - the same as the rule. That is a tie, not a win.
+               A <progress> element rather than a styled <span>: the value is an attribute,
+               so no inline CSS is needed and the bar is readable to a screen reader. #}
+            <progress class="bar {{ 'best' if row.hard > 0.591 else 'below' }}"
+                      value="{{ row.hard }}" max="1">{{ "%.3f"|format(row.hard) }}</progress>
+            {% endif %}
+          </td>
+          <td class="num">{{ "%.3f"|format(row.overall) }}{% if row.seeds > 1 %} &plusmn;{{ "%.3f"|format(row.spread) }}{% endif %}</td>
+          <td class="num">{{ row.seeds }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="note" style="margin-top:4px">
+      <strong>hard</strong> = score on the hard questions. This is the column that matters.
+      <strong>overall</strong> = score on all questions. Green bars beat the fuzzy rule.
+    </p>
+  </section>
+
+  <!-- ============================ RIGHT: context ============================ -->
+  <aside>
+    <h2>What a model must beat</h2>
+    <table>
+      <tbody>
+        {% for b in baselines %}
+        <tr>
+          <td>{{ b.name }}</td>
+          <td class="num">{{ "%.3f"|format(b.hard) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note" style="margin-top:4px">
+      These do no learning at all. Only <strong>2 of {{ rows|length }}</strong> models beat the
+      fuzzy rule.
+    </p>
+
+    {# Scrolls inside its own box rather than growing the page, so this column can hold the
+       full explanation on a tall window and still fit a short one. #}
+    <div class="grow scroll" style="margin-top:12px">
+      <h3>Why "hard" and not the overall score</h3>
+      <p>
+        About 60% of questions can be answered by checking whether the answer text appears in
+        the passage. A model that learns only that trick scores well overall and understands
+        nothing. The <strong>hard</strong> questions are the ones where that trick fails, so
+        that column is the only honest one.
+      </p>
+
+      <h3>The clearest example</h3>
+      <p>
+        <strong>Similarity numbers + Logistic Regression</strong> has the best overall score
+        here (0.730) and almost the worst hard score (0.490). Its weights show it leans on
+        "does the answer appear in the passage". It learned the trick. Judged by the overall
+        column it would look like the best model; it is closer to the least useful.
+      </p>
+
+      <h3>Why the tie at the top is real</h3>
+      <p>
+        The top two both score 0.610. We checked instead of guessing: on the 218 hard records
+        they disagree on 28, and each is right on exactly 14 (McNemar, p = 1.000). So it is
+        reported as a tie.
+      </p>
+
+      <h3>Why one model says "unreliable"</h3>
+      <p>
+        Bag of Words + linear SVM never finishes fitting. Raw word counts run up to 55 with no
+        ceiling and the SVM cannot settle on that, even after 20,000 tries. TF-IDF scales
+        everything to 1 and settles in seconds. We still report the score, marked unreliable,
+        because <em>why</em> it fails shows exactly what TF-IDF's weighting is for.
+      </p>
+
+      <h3>Two small numbers you may notice</h3>
+      <p>
+        The &plusmn; spreads are worked out from the 3-decimal numbers in the log, so they can
+        differ by 0.001 from the guide, which used full precision. And Bag of Words + Logistic
+        Regression lands on exactly 0.591 &mdash; the same as the fuzzy rule &mdash; so its bar
+        is grey. Matching a rule is not beating it.
+      </p>
+
+      <p class="note">
+        Settings: {{ fmt }} input, {{ variant }} text cleaning, seed {{ seed }}. Numbers come
+        straight from <code>results/experiment_log.csv</code>.
+      </p>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}

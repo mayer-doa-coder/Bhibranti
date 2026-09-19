@@ -60,7 +60,21 @@ FINAL_LEARNING_RATE = 0.0001
 SUBSAMPLE = 1e-3       # how aggressively very common words are skipped
 BATCH = 8192           # pairs updated at once, so numpy does the work instead of Python
 
-VECTORS_FILE = Path(__file__).resolve().parents[1] / "data" / "processed" / "skipgram.npz"
+VECTORS_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
+
+
+def vectors_path(seed: int = 42, variant: str = "V1") -> Path:
+    """Where one set of vectors lives.
+
+    The seed and the variant are both in the name because both change the vectors:
+    training starts from random numbers, and stemming changes the words themselves.
+    Every reader and writer in the project uses this one function, so they cannot
+    disagree about the filename.
+    """
+    return VECTORS_DIR / f"skipgram_s{seed}_{variant}.npz"
+
+
+VECTORS_FILE = vectors_path()          # the default set: seed 42, variant V1
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
@@ -280,15 +294,20 @@ def inverse_document_frequency(documents: list[list[str]]) -> dict[str, float]:
 # COMMAND LINE
 # =============================================================================
 
-def train_on_split(seed: int = 42, verbose: bool = True) -> SkipGram:
-    """Train on the TRAIN split only - dev and test never shape the vectors."""
+def train_on_split(seed: int = 42, verbose: bool = True, variant: str = "V1") -> SkipGram:
+    """Train on the TRAIN split only - dev and test never shape the vectors.
+
+    `variant` must match the preprocessing the vectors will later be used with. Vectors
+    learned on whole words know nothing about "কলেজ" once stemming has turned "কলেজের"
+    into it, so the M10 experiment trains a fresh set for every variant.
+    """
     from preprocess import as_tokens
     from splits import load_split
 
-    documents = [as_tokens(r, "F2") for r in load_split("train")]
+    documents = [as_tokens(r, "F2", variant) for r in load_split("train")]
     if verbose:
         print(f"  {len(documents):,} documents, "
-              f"{sum(len(d) for d in documents):,} tokens, seed {seed}")
+              f"{sum(len(d) for d in documents):,} tokens, {variant}, seed {seed}")
     return SkipGram(seed=seed).fit(documents, verbose=verbose)
 
 
@@ -297,7 +316,8 @@ def run_check() -> int:
     from preprocess import as_tokens
     from splits import load_split
 
-    model = SkipGram.load() if VECTORS_FILE.exists() else train_on_split()
+    path = vectors_path()
+    model = SkipGram.load(path) if path.exists() else train_on_split()
     dev_documents = [as_tokens(r, "F2") for r in load_split("dev")]
 
     print("=" * 78)
@@ -324,11 +344,13 @@ def main() -> int:
     parser.add_argument("--train", action="store_true", help="train and save the vectors")
     parser.add_argument("--check", action="store_true", help="are the neighbours sensible?")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--variant", default="V1",
+                        help="which text preparation the vectors should learn from")
     args = parser.parse_args()
 
     if args.train:
-        model = train_on_split(args.seed)
-        print(f"  saved to {model.save()}")
+        model = train_on_split(args.seed, variant=args.variant)
+        print(f"  saved to {model.save(vectors_path(args.seed, args.variant))}")
         return 0
     if args.check:
         return run_check()

@@ -573,8 +573,15 @@ before any milestone is called complete:
 | **Leakage check** | No exact or near-duplicate `question` across train/test |
 | **Determinism smoke test** | Same seed → same metrics on a small subset |
 
-Any change to `src/preprocess.py`, `src/generate.py`, or split logic requires re-running schema
-validation, split integrity, balance, and the shortcut probe.
+Any change to `src/build_corpus.py`, `src/merge_annotation.py`, or split logic requires re-running
+schema validation, split integrity, balance, and the shortcut probe:
+
+```bash
+python src/audit.py --data data/splits            # all probes + structural checks
+```
+
+(`src/generate.py` was named here in the original plan, back when pairs were going to be
+generated. They are not: the corpus is drawn from real sources by `src/build_corpus.py`.)
 
 ---
 

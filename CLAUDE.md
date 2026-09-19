@@ -24,7 +24,9 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 ## Current status
 
 **M0 done. M1 done. M2 done (kappa = 0.717). M3 done (test kappa = 0.865, merged, D8 met,
-180 flagged pairs excluded). Next up: M4 — the model ladder.**
+180 flagged pairs excluded). M4 under way — 6 of the ladder's steps built and measured
+(text tools, features, input formats, scoring, the classical models, the M10 ablation).
+Next up: `src/train_neural.py` — the recurrent models.**
 
 **Usable data (load it only through `src/splits.py`):** train 3,067 pairs / 6,134 records ·
 dev 619 / 1,238 · test 614 / 1,228.
@@ -86,8 +88,48 @@ dev 619 / 1,238 · test 614 / 1,228.
       M12 similarity features. **gensim has no Python 3.14 build, so Skip-gram is written out
       from Lab 3** (negative sampling instead of full softmax); its neighbours are sensible
       (1971 -> মার্চ, জিয়াউর; সরকার -> মুজিবনগর, প্রবাসী) and it covers 94% of dev words.
-      Lab-vs-library Naive Bayes check: **100% agreement**. 35 tests pass.
-- [ ] Model ladder: next is the M10 preprocessing experiment, then `src/train_neural.py`
+      Lab-vs-library Naive Bayes check: **100% agreement**.
+      **Best on the target (has-context + hard): tfidf_logreg and tfidf_svm tie at 0.610**
+      (McNemar p = 1.000 - 14 wins each on the 28 they disagree about). M12 tops the overall
+      table at 0.730 but sinks to 0.490 on hard: it learned the string-match shortcut.
+- [x] **Repo-wide bug sweep (2026-09-19)** - 5 fixed: stray `<SEP>` markers polluting every M1
+      feature column (M1 re-measured, moved <= 0.014); word-vector filenames disagreeing between
+      writer and readers (now one `vectors_path(seed, variant)`); run-id generator could raise
+      StopIteration; `xgboost`/`rapidfuzz` missing from Tier 1 of requirements.txt so a fresh
+      clone would fail; an unused import. Verified clean: no dev leakage, test split guarded at
+      every entry point, reruns reproduce exactly, all 12 documented settings match the code.
+      **Second pass, 5 more:** `results/experiment_log.csv` was opened for reading before it was
+      known to exist, so a deleted `results/` folder would throw away a finished run at the last
+      step (now `evaluate.ensure_log_file()`, and `LOG_FILE` is defined once instead of three
+      times); `load_or_train_vectors` still spelled the vector filename by hand instead of calling
+      `vectors_path()` - the same drift that caused bug 2; long runs buffered all output, so a
+      working ablation looked hung (progress lines now flush); `AGENT.md` §10.5 required
+      re-running the audit after changes to `src/generate.py`, a file that never existed;
+      `features.py` imported `Path` and never used it. Checked and found correct: every path in
+      the docs resolves, every documented CLI flag exists, every score quoted in the guide and
+      walkthrough matches `results/experiment_log.csv`, no duplicate run ids, and all module
+      paths are `__file__`-anchored so the scripts work from any folder. 148 tests pass.
+- [x] **M4 step 6 - M10 preprocessing ablation** (`--ablation`, Table 6): V0-V4 + V2-demo x
+      tfidf_logreg and skipgram_mean_xgb, dev, seed 42.
+      **The textbook cleanup is worth nothing measurable here** - tfidf_logreg moves 0.542-0.551
+      overall across V0-V4 and holds 0.610 on hard for three of five. V1 stays the default.
+      **V2-demo is the finding: dropping negation costs 0.184 on `contradiction`** (0.712 ->
+      0.528, -26% relative) **while its hard score stays at 0.609 vs the default's 0.610** - the
+      damage is invisible in the headline number and only appears in the error-type slice. Best
+      argument in the project for §12.1. Stop-word removal actively hurts Skip-gram (0.501 on
+      hard, worst cell; its best variant is V0, no cleaning at all). V4 does buy a smaller model:
+      201,504 features against V0's 259,454 for the same score.
+- [x] **Demo interface** (`src/app.py`, `src/serving.py`, `web/`): type a question + answer
+      (+ optional passage), all 12 models judge it, with the M12 evidence and the two rule
+      baselines shown beside them. `/models` is the scoreboard, read from
+      `results/experiment_log.csv` and averaged over seeds so it can never disagree with
+      Table 5. Two-column layout, fits one laptop screen (576px) with no scrolling.
+      `train_and_predict` was split into `fit_model()` + `FittedModel.predict()` so serving
+      and training are ONE code path; verified behaviour-preserving (tfidf_logreg still
+      0.549 / 0.610 / 215,601 features).
+      **No Prometheus/Grafana** - removed 2026-09-19 at the user's request. Do not add
+      metrics endpoints, `src/telemetry.py`, or an `ops/` stack back.
+- [ ] Model ladder: next is `src/train_neural.py` (M3 recurrent models, M13 Transformer)
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
 knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
@@ -173,6 +215,11 @@ python src/train_classical.py --all --seeds --log           # every model, 3 see
 python src/train_classical.py --model tfidf_logreg --variant V2   # M10 ablation
 python src/train_classical.py --lab-check        # our Naive Bayes vs the library's
 
+# THE DEMO - type an answer, see what all 12 models say (guide sec 15, walkthrough 18.9)
+python src/serving.py --build                    # once, ~6 min: fit all 12 and save them
+python src/serving.py --check                    # load them back, predict one record
+python src/app.py                                # then open http://127.0.0.1:8000
+
 # Not yet written (M4-M6) - see guide §1.3 for the planned modules
 python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
 python src/train_classical.py    --model tfidf_nb --variant V2       # M10 preprocessing ablation
@@ -215,6 +262,10 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/train_classical.py` | ✅ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3). `--all` compares them |
 | `src/skipgram.py` | ✅ Lab 3's Skip-gram, written out. Vectors are per-seed: `data/processed/skipgram_s42.npz` |
 | `tests/test_skipgram.py` · `tests/test_train_classical.py` | ✅ 35 tests for the word vectors and the training harness |
+| `src/serving.py` | ✅ Fits every model once and caches it in `data/processed/serving/` (gitignored, 83 MB). Uses `train_classical.fit_model()` — **never rebuild the pipeline here or the demo drifts from Table 5** |
+| `src/app.py` | ✅ The demo: `/` judge an answer, `/models` the scoreboard, `/health` |
+| `web/templates/` · `web/static/` | ✅ The demo's pages and its one stylesheet |
+| `tests/test_serving.py` | ✅ 29 tests. The ones needing real models skip themselves if `--build` has not been run |
 | `src/train_neural.py` | ⬜ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5) |
 | `src/train_transformer.py` | ⬜ Pretrained encoder fine-tuning (M4/M5) |
 | `src/further_pretrain.py` | ⬜ MLM further pretraining (mBERT / XLM-R only) |

@@ -63,6 +63,26 @@ SEEDS = (42, 1337, 2024)
 
 TABLES_DIR = Path(__file__).resolve().parents[1] / "results" / "tables"
 
+# The experiment log. Every script that runs a model appends to this one file, so it lives
+# here - the module they all already import - rather than being spelled out in each of them.
+LOG_FILE = Path(__file__).resolve().parents[1] / "results" / "experiment_log.csv"
+LOG_HEADER = ["run_id", "date", "model", "input_format", "preprocessing", "seed", "lr",
+              "batch", "epochs", "split", "dev_macro_f1", "test_macro_f1", "notes"]
+
+
+def ensure_log_file() -> Path:
+    """Create the log with its header row if it is not there, and hand back the path.
+
+    Call this before reading or appending. Without it, a fresh clone that has not committed
+    `results/` - or anyone who deleted the folder - loses a finished training run to a
+    FileNotFoundError at the very last step, after the model has already been trained.
+    """
+    if not LOG_FILE.exists():
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with LOG_FILE.open("w", encoding="utf-8", newline="") as fh:
+            csv.writer(fh).writerow(LOG_HEADER)
+    return LOG_FILE
+
 
 # =============================================================================
 # PART 1 - THE BASIC MEASURES, written out rather than imported
@@ -309,7 +329,13 @@ def mcnemar(truth: list[int], predicted_a: list[int], predicted_b: list[int]) ->
 
 
 def summarise_seeds(scores: list[float]) -> tuple[float, float]:
-    """Mean and spread across the three seeds - always reported together (PRD §5.4)."""
+    """Mean and spread across the three seeds - always reported together (PRD §5.4).
+
+    The spread is the population standard deviation (numpy's default), not the sample one.
+    With three seeds the two differ by a factor of 1.22, so it is worth being able to say
+    which this is: it describes the spread of the three runs we actually did, and is not an
+    estimate of how a fourth seed would land.
+    """
     return float(np.mean(scores)), float(np.std(scores))
 
 
@@ -443,7 +469,16 @@ def report(records: list[dict], predicted: list[int], scores: list[float] | None
 
 
 def write_table(rows: list[dict], filename: str) -> Path:
-    """Save a results table as CSV, for the report."""
+    """Save a results table as CSV, for the report.
+
+    An empty table is refused rather than written. The column names come from the first row,
+    so with no rows this used to die on `rows[0]` with a bare IndexError - at the very end of
+    a long run, after the results were computed and with nothing in the message to say that
+    an empty table was the cause.
+    """
+    if not rows:
+        raise ValueError(f"refusing to write an empty table to {filename}: "
+                         "there are no results, so the column names are unknown")
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     path = TABLES_DIR / filename
     with path.open("w", encoding="utf-8", newline="") as fh:

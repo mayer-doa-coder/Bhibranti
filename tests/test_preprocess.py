@@ -194,3 +194,48 @@ def test_writing_a_split_leaves_out_the_label_revealing_fields(tmp_path):
 
 def test_the_default_budget_is_the_project_default():
     assert MAX_TOKENS == 256
+
+
+# --------------------------------- as_text and as_tokens are different readers ---
+
+def test_f2_and_f3_give_identical_tokens():
+    """Not a defect - a flat token list has no segments, so F3 cannot mean anything here.
+
+    It is asserted so the fact stays visible: anyone comparing F2 against F3 on a
+    bag-of-words model is comparing a thing with itself.
+    """
+    record = {"question": "প্রশ্ন কী", "candidate_answer": "উত্তর",
+              "context": "অনুচ্ছেদ এখানে", "condition": "has_context"}
+    assert as_tokens(record, "F2") == as_tokens(record, "F3")
+
+
+def test_as_text_does_distinguish_f2_from_f3():
+    """The encoder-facing view must keep them apart, or the M9 sweep is meaningless."""
+    record = {"question": "প্রশ্ন কী", "candidate_answer": "উত্তর",
+              "context": "অনুচ্ছেদ এখানে", "condition": "has_context"}
+    assert as_text(record, "F2") != as_text(record, "F3")
+    assert format_record(record, "F3").text_b is not None, "F3 must keep two segments"
+    assert format_record(record, "F2").text_b is None, "F2 is one segment"
+
+
+def test_the_token_view_marks_every_part_boundary():
+    """as_tokens separates all three parts; as_text does not. Deliberate, and documented in
+    as_tokens' docstring - a recurrent model has no other way to find the answer."""
+    record = {"question": "প্রশ্ন কী", "candidate_answer": "উত্তর",
+              "context": "অনুচ্ছেদ এখানে", "condition": "has_context"}
+    assert as_tokens(record, "F2").count(SEPARATOR) == 2
+    assert as_text(record, "F2").count(SEPARATOR) == 0
+
+
+def test_train_classical_refuses_the_encoder_only_format():
+    """A run logged as F3 that is really F2 would be a false experimental result."""
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    done = subprocess.run(
+        [sys.executable, "-X", "utf8", str(root / "src" / "train_classical.py"),
+         "--model", "bow_nb", "--format", "F3"],
+        capture_output=True, text=True, cwd=root)
+    assert done.returncode != 0, "F3 must be rejected, not silently treated as F2"
+    assert "F3" in done.stderr or "invalid choice" in done.stderr

@@ -1,0 +1,420 @@
+/* BangHallu demo.
+   Built for a laptop screen: full width, two columns, as little scrolling as possible.
+   Plain surfaces and hairline rules - this is a lab instrument, not a product page.
+   Bengali needs extra line-height or the vowel marks collide. */
+
+:root {
+  --ink:        #1a1a18;
+  --ink-soft:   #55534d;
+  --ink-faint:  #8a877f;
+  --paper:      #f7f6f2;
+  --panel:      #ffffff;
+  --rule:       #e2ded5;
+  --rule-firm:  #b8b3a8;
+  --accent:     #7a2518;
+  --correct:    #2c5530;
+  --wrong:      #8c2f22;
+  --flag:       #8a6d1f;
+  --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --text: system-ui, -apple-system, "Segoe UI", "Noto Sans Bengali", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+/* The whole page is one column the exact height of the window: masthead, then the content
+   which absorbs all the slack, then the footer pinned underneath. Without this the content
+   is only as tall as it needs to be and everything below it is dead space. */
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Full width with a small gutter, so nothing is wasted at the sides.
+   Left/right only, never the `padding` shorthand: <main> and <footer> both carry this class
+   and set their own vertical padding, which the shorthand would silently reset to zero. */
+.wrap { padding-left: 18px; padding-right: 18px; }
+
+/* ---------------------------------------------------------------- masthead --- */
+
+.masthead {
+  border-bottom: 2px solid var(--accent);
+  background: var(--panel);
+}
+.masthead .wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding-top: 8px;
+  padding-bottom: 7px;
+}
+.masthead h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.masthead .sub { margin: 0; font-size: 12px; color: var(--ink-faint); }
+.masthead nav { margin-left: auto; display: flex; gap: 16px; font-size: 13px; }
+.masthead nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+.masthead nav a:hover { color: var(--ink); }
+.masthead nav a.here { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* flex:1 takes every pixel the masthead and footer do not. min-height:0 is required or a
+   flex child refuses to shrink below its content and the page scrolls anyway. */
+main {
+  padding-top: 9px;
+  padding-bottom: 5px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------- type --- */
+
+h2 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--rule);
+}
+p { margin: 0 0 6px; }
+.note { font-size: 12px; color: var(--ink-soft); }
+.bn { line-height: 1.75; }
+
+code { font-family: var(--mono); font-size: 0.92em; background: #efece5; padding: 0 3px; }
+a { color: var(--accent); }
+
+/* ----------------------------------------------------------- page layout --- */
+
+/* Left: the form and the examples. Right: the results. Side by side, so a verdict
+   appears next to the thing that produced it instead of far below it. */
+.layout {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  /* minmax(0, 1fr), not the default `auto`. An auto row sizes itself to its tallest child and
+     refuses to shrink, so the columns would push the page past the bottom of the window no
+     matter how much overflow handling the children have. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;      /* both columns run the full height, not just their content */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Each column is itself a flex column, so one child inside it can be told to absorb the
+   leftover height. That is what removes the empty band at the bottom. */
+.layout > aside,
+.layout > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.results-grid > div {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (max-width: 1150px) {
+  .layout { grid-template-columns: 1fr; }
+  .results-grid { grid-template-columns: 1fr; }
+}
+
+.block { margin-bottom: 12px; }
+
+/* The one child in a column that soaks up the spare height. */
+.grow { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* A table inside .grow.stretch fills the box by making its rows taller. Used ONLY where the
+   table is already nearly as tall as the space, so the stretch is a few pixels per row. A
+   short table must never be stretched this way - seven rows spread over 500px reads as a
+   broken page, not a dense one. */
+/* height:100% stretches the table when the box is taller than the rows; overflow-y handles
+   the other direction, so a long table scrolls inside its own box rather than pushing the
+   whole page into a scrollbar. */
+.grow.stretch { overflow-y: auto; }
+.grow.stretch > table { height: 100%; }
+/* Both spellings: `.grow.scroll` is one element that both fills and scrolls, `.grow > .scroll`
+   is a scrolling child inside a filling box. Writing only the child combinator silently missed
+   the first case, and the column overflowed the window instead of scrolling. */
+.grow.scroll,
+.grow > .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Extra detail that is worth showing when the window is tall enough to hold it, and would
+   push the page into scrolling on a short laptop. Filling space with real information beats
+   stretching rows into whitespace. */
+td.model .why { display: none; }
+.tall-only { display: none; }
+/* 700 CSS pixels, not 800. A 1920x1080 monitor at Windows' default 125% scaling reports
+   about 730 CSS pixels of viewport, so a threshold of 800 never fires on the very screens
+   that have room to spare. Below 700 the page stays compact and still does not scroll. */
+@media (min-height: 700px) {
+  td.model .why { display: block; }
+  .tall-only { display: block; }
+}
+
+/* ------------------------------------------------------------------ forms --- */
+
+.field { margin-bottom: 8px; }
+.field label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+
+input[type=text], textarea {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--rule-firm);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 13.5px;
+  line-height: 1.6;
+  border-radius: 0;
+}
+input[type=text]:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+textarea { resize: vertical; }
+
+button {
+  padding: 6px 16px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 0;
+}
+button:hover { background: #5d1c12; }
+
+.error {
+  border-left: 3px solid var(--wrong);
+  background: #fbf2f0;
+  padding: 5px 9px;
+  margin-bottom: 8px;
+}
+
+/* ----------------------------------------------------------------- tables --- */
+
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule-firm);
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+td { padding: 3px 7px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+tr:last-child td { border-bottom: 1px solid var(--rule-firm); }
+td.num, th.num {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+tbody tr:hover td { background: #f2efe8; }
+tr.leader td { background: #f0f3ec; }
+td.model { line-height: 1.25; }
+td.model .why { color: var(--ink-faint); font-size: 10.5px; line-height: 1.2; }
+
+/* --------------------------------------------------------------- verdicts --- */
+
+.verdict { font-weight: 600; white-space: nowrap; }
+.verdict.correct { color: var(--correct); }
+.verdict.wrong   { color: var(--wrong); }
+.verdict.none    { color: var(--ink-faint); font-weight: 400; }
+
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid var(--flag);
+  color: var(--flag);
+  padding: 0 4px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------- the headline verdict --- */
+
+.headline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+  border-top: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 7px 12px;
+  margin-bottom: 10px;
+}
+.headline .count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.headline .of { color: var(--ink-faint); font-weight: 400; font-size: 14px; }
+.headline .says { font-size: 13px; }
+.headline .timing { margin-left: auto; color: var(--ink-faint); font-size: 11.5px; white-space: nowrap; }
+
+.warnstrip {
+  border-left: 3px solid var(--flag);
+  background: #fdfaf1;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+}
+.warnstrip strong { font-weight: 600; }
+
+/* ------------------------------------------------------- example records --- */
+
+/* Takes whatever height is left in the left column and scrolls inside it, so the list is as
+   long as the screen allows and the page itself never scrolls. */
+.examples {
+  border-top: 1px solid var(--rule);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.examples .row { padding: 5px 0; border-bottom: 1px solid var(--rule); }
+.examples .q {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 2px;
+  /* One line only: the list is for picking from, not for reading. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.examples .pair { display: flex; gap: 6px; }
+.examples a.pick {
+  flex: 1 1 0;
+  min-width: 0;
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--rule-firm);
+  padding: 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--panel);
+}
+.examples a.pick.ok   { color: var(--correct); }
+.examples a.pick.bad  { color: var(--wrong); }
+.examples a.pick:hover { border-color: var(--accent); background: #fbf8f4; }
+
+/* --------------------------------------------------------- the record shown --- */
+
+.record { font-size: 12.5px; }
+.record .lbl {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 5px;
+}
+.record .passage {
+  max-height: 88px;
+  overflow-y: auto;
+  border-left: 2px solid var(--rule);
+  padding-left: 8px;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------ empty state --- */
+
+.empty {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  padding: 14px 16px;
+  flex: 1 1 auto;       /* fills the right-hand side before anything has been checked */
+  min-height: 0;
+  overflow-y: auto;
+}
+.empty ol { margin: 6px 0 0; padding-left: 18px; }
+.empty li { margin-bottom: 3px; }
+
+/* --------------------------------------------------------------- score bar --- */
+
+/* A <progress> carries its own value, so the width needs no inline style. Each browser
+   engine names the two parts differently; the rules cannot be combined, because an
+   unrecognised selector makes a whole rule be dropped. */
+progress.bar {
+  display: block;
+  width: 100%;
+  min-width: 70px;
+  height: 5px;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #e4e0d7;
+}
+progress.bar::-webkit-progress-bar { background: #e4e0d7; }
+progress.bar::-webkit-progress-value { background: var(--ink-soft); }
+progress.bar::-moz-progress-bar { background: var(--ink-soft); }
+progress.bar.best::-webkit-progress-value { background: var(--correct); }
+progress.bar.best::-moz-progress-bar { background: var(--correct); }
+progress.bar.below::-webkit-progress-value { background: var(--rule-firm); }
+progress.bar.below::-moz-progress-bar { background: var(--rule-firm); }
+
+/* ------------------------------------------------- collapsible explanations --- */
+
+/* Sub-headings inside an explanation column. Without an explicit rule these fall back to the
+   browser default, which is 1.17em with 1em margins above and below - enough air to push the
+   column past the bottom of the window on its own. */
+h3 {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 11px 0 2px;
+}
+h3:first-child { margin-top: 0; }
+
+/* --------------------------------------------------------------- footer --- */
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 5px;
+  padding-bottom: 7px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+footer p { margin: 0; }

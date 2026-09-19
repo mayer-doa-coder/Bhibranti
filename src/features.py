@@ -40,7 +40,6 @@ import csv
 import math
 import sys
 from datetime import date
-from pathlib import Path
 
 import numpy as np
 
@@ -48,7 +47,7 @@ from sklearn.metrics import roc_auc_score
 
 # The scoring lives in one place, so a change to it reaches every file at once.
 # (evaluate.py imports THIS file only inside a function, so the two do not clash.)
-from evaluate import macro_f1
+from evaluate import ensure_log_file, macro_f1
 from text_bn import clean, tokenize
 
 # =============================================================================
@@ -100,7 +99,6 @@ NO_PASSAGE = {
 # \x02 is a control character, so it can never appear in real Bengali text.
 START = "\x02"
 
-LOG_FILE = Path(__file__).resolve().parents[1] / "results" / "experiment_log.csv"
 
 
 # =============================================================================
@@ -698,7 +696,9 @@ def run_baseline(write_log: bool) -> int:
     print("=" * 78)
 
     if write_log:
-        rows = list(csv.reader(LOG_FILE.open(encoding="utf-8")))
+        # One path for both the read and the write - see the note in train_classical.log_run.
+        log = ensure_log_file()
+        rows = list(csv.reader(log.open(encoding="utf-8")))
         existing = {r[0] for r in rows[1:] if r}
         new_rows = []
         plan = [("all", "baseline_001", fuzzy, threshold, "tuned on all train has-context"),
@@ -716,9 +716,9 @@ def run_baseline(write_log: bool) -> int:
                              f"has-context {slice_name} (n={n}); exact rule scores "
                              f"{exact[slice_name][0]:.3f} on the same records"])
         if new_rows:
-            with LOG_FILE.open("a", encoding="utf-8", newline="") as fh:
+            with log.open("a", encoding="utf-8", newline="") as fh:
                 csv.writer(fh).writerows(new_rows)
-            print(f"  logged {len(new_rows)} row(s) to {LOG_FILE.name}")
+            print(f"  logged {len(new_rows)} row(s) to {log.name}")
         else:
             print("  nothing logged: those run_ids are already in the log")
     return 0

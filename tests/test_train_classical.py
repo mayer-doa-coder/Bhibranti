@@ -17,7 +17,10 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from train_classical import (  # noqa: E402  (the import has to come after the path is set)
+    ABLATION_MODELS,
+    ABLATION_VARIANTS,
     MODELS,
+    VARIANT_MEANING,
     SparseFeatures,
     confidence,
     embedding_matrix,
@@ -170,3 +173,116 @@ def test_the_labs_naive_bayes_handles_a_word_it_never_saw():
     """Adding 1 to every count is what stops an unseen word making the whole thing zero."""
     model = lab_naive_bayes(["ভাল"] * 3 + ["খারাপ"] * 3, [1, 1, 1, 0, 0, 0])
     assert lab_naive_bayes_predict(model, "সম্পূর্ণ_অজানা") in (0, 1)
+
+
+# ------------------------------------------- M10: does the cleanup help? ---
+
+def test_the_ablation_covers_every_variant_the_guide_lists():
+    assert ABLATION_VARIANTS == ["V0", "V1", "V2", "V3", "V4", "V2-demo"]
+
+
+def test_every_variant_has_a_plain_english_meaning():
+    """The table is meant to be readable by someone who has not seen the code."""
+    for variant in ABLATION_VARIANTS:
+        assert VARIANT_MEANING[variant], variant
+
+
+def test_the_ablation_uses_real_models_from_the_list():
+    for name in ABLATION_MODELS:
+        assert name in MODELS, name
+
+
+def test_the_ablation_covers_both_families_that_depend_on_preprocessing():
+    families = {MODELS[name][0] for name in ABLATION_MODELS}
+    assert families == {"M1", "M2"}, (
+        "M1 counts words and M2 learns word vectors, so both change when the words change. "
+        "M11 and M12 read the cleaned text directly and are unaffected.")
+
+
+def test_each_variant_changes_something_specific():
+    """If two variants gave identical words, comparing them would prove nothing.
+
+    The sentence is built to exercise all three steps: "এবং" is a common word, "কলেজের"
+    can be stemmed to "কলেজ", and "নয়" is a negation that only V2-demo throws away.
+    """
+    from preprocess import as_tokens
+    sentence = record(answer="কলেজের ছাত্ররা এবং বইটি বিভক্ত নয়", passage="",
+                      question="কারা পড়েনি?")
+    words = {v: as_tokens(sentence, "F1", v) for v in ABLATION_VARIANTS}
+
+    assert words["V0"] != words["V1"], "cleaning and tokenizing must change something"
+    assert words["V2"] != words["V1"], "dropping common words must remove এবং"
+    assert words["V3"] != words["V1"], "stemming must shorten কলেজের"
+    assert words["V4"] != words["V2"], "V4 stems on top of V2"
+    assert words["V2-demo"] != words["V2"], "only the demo variant throws away নয়"
+
+
+def test_the_demo_variant_is_the_one_that_loses_negation():
+    """V2-demo exists to show the damage; V2 must keep negation, V2-demo must not."""
+    from preprocess import as_tokens
+    from text_bn import clean
+    sentence = record(answer="বিভক্ত নয়", passage="", question="কী?")
+    assert clean("নয়") in as_tokens(sentence, "F1", "V2")
+    assert clean("নয়") not in as_tokens(sentence, "F1", "V2-demo")
+
+
+def test_no_separator_markers_leak_into_the_columns():
+    """Each column holds ONE part, so the between-parts marker has no business there.
+
+    It used to: every passage column ended "... <SEP> <SEP>" and every question column
+    "... <SEP>", because each part was routed through the flat-sequence builder. Those
+    markers then became features of their own, in every single document.
+    """
+    from preprocess import SEPARATOR
+    for fmt in ("F1", "F2"):
+        for column, texts in parts_as_text(RECORDS, fmt, "V1").items():
+            assert all(SEPARATOR not in t for t in texts), f"{fmt}/{column} still has markers"
+
+
+def test_a_column_holds_only_its_own_part():
+    columns = parts_as_text([record(answer="ঢাকা", question="কোথায়?",
+                                    passage="বাংলাদেশের রাজধানী")], "F2", "V1")
+    assert columns["answer"][0].split() == ["ঢাকা"]
+    assert "কোথায়" not in columns["context"][0]
+    assert "রাজধানী" not in columns["question"][0]
+
+
+# ------------------------------------------- a warning on one seed is not lost ---
+
+def test_a_convergence_warning_on_any_seed_survives_the_summary(monkeypatch):
+    """The failure this catches is silent by nature.
+
+    `run_one` hands back the notes for one seed at a time. If the summary simply kept the
+    LAST seed's notes, a model that failed to converge on seed 42 but converged on seed
+    2024 would be printed as clean - and "did not converge" is the difference between a
+    real score and a meaningless one.
+    """
+    import types
+
+    import evaluate as ev
+    import train_classical as tc
+
+    calls = {"n": 0}
+
+    def fake_run_one(name, seed, fmt, variant, vectors, quiet=False):
+        calls["n"] += 1
+        notes = {"trained in": "0.1s"}
+        if seed == 42:                                   # only the FIRST seed complains
+            notes["WARNING"] = "svm did not converge"
+        return types.SimpleNamespace(macro_f1=0.5), 0.5, notes
+
+    monkeypatch.setattr(tc, "run_one", fake_run_one)
+    monkeypatch.setattr(tc, "load_or_train_vectors", lambda seed, variant: None)
+    monkeypatch.setattr(tc, "MODELS", {"toy": ("M2", "skipgram_mean", "xgb")})
+    monkeypatch.setattr(tc, "load_split", lambda split: [])
+    monkeypatch.setattr(ev, "baselines_for", lambda records: {})
+
+    captured = []
+    monkeypatch.setattr("builtins.print", lambda *a, **k: captured.append(" ".join(map(str, a))))
+    tc.run_all((42, 1337, 2024), "F2", "V1", write_log=False)
+
+    assert calls["n"] == 3, "a model with randomness must run on all three seeds"
+    assert any("did not converge" in line for line in captured), (
+        "the seed-42 warning was swallowed by the later seeds")
+    assert any("42" in line for line in captured if "did not converge" in line), (
+        "the report should say WHICH seed failed to converge")

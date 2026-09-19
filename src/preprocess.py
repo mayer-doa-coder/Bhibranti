@@ -174,6 +174,21 @@ def as_tokens(record: dict, fmt: str = "F2", variant: str = "V1",
 
     `variant` is the M10 preprocessing variant from text_bn (V1 is the default: clean
     and split only). The separator is kept as one token, never split up.
+
+    HOW THIS DIFFERS FROM as_text(), AND WHY
+    This marks EVERY boundary with a separator: [passage, <SEP>, question, <SEP>, answer].
+    `as_text()` does not - F2 runs the three together and only F3 inserts one separator,
+    because that is what the formats mean to a pretrained encoder.
+
+    The two are for different readers and the difference is deliberate. A recurrent model
+    reads one flat sequence and has no other way to know where the answer starts; an encoder
+    gets that from its segment ids. Do not "fix" this by making them match without
+    re-measuring: every Skip-gram vector and every M2 score in Table 5 was produced from
+    these tokens, so changing them invalidates those numbers.
+
+    **F2 and F3 give the same tokens.** F3's whole content is that the passage is a separate
+    segment, and a flat token list has no segments. Callers that treat the two as different
+    experiments are fooling themselves - see the `--format` choices in train_classical.py.
     """
     parts = record_parts(record, budget, raw=(variant == "V0"), length_fn=length_fn)
     pieces = [parts.question, parts.answer] if fmt == "F1" or not parts.context else (

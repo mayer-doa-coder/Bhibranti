@@ -1279,7 +1279,8 @@ Nobody told it any of that — it worked it out from which words appear near eac
 | Model | Score overall | Score on **hard** questions |
 |---|---|---|
 | Similarity numbers (M12) | **0.730 — the best** | **0.490 — nearly the worst** |
-| TF-IDF + Logistic Regression | 0.554 | **0.624 — the best** |
+| TF-IDF + Logistic Regression | 0.549 | **0.610 — joint best** |
+| TF-IDF + SVM | 0.548 | **0.610 — joint best** |
 | Word vectors (M2) | 0.503–0.520 | 0.500–0.529 |
 | *the two rules to beat* | | *0.487 and 0.591* |
 
@@ -1288,9 +1289,13 @@ best overall score is the *least* useful one. Given the "does the answer appear 
 measurement, it leaned on it almost entirely — and on hard questions, where that trick stops
 working, it fell to 0.490, below even the simple fuzzy rule.
 
-Meanwhile TF-IDF + Logistic Regression looks mediocre overall (0.554) but is the **only** kind of
-model that clearly beats both rules on hard questions (0.624 against 0.487 and 0.591). If we had
-judged by the overall number alone, we would have picked the wrong model.
+Meanwhile TF-IDF + Logistic Regression looks mediocre overall (0.549) but, together with TF-IDF +
+SVM, is the only kind of model that clearly beats both rules on hard questions (0.610 against 0.487
+and 0.591). If we had judged by the overall number alone, we would have picked the wrong model.
+
+Those two are an exact tie, and we checked rather than guessed: on the 218 hard questions they
+disagree on 28, and each gets exactly 14 of them right. So we report a tie, which is what the
+project's rules require when two models are this close.
 
 **Two honest problems we report rather than hide**
 
@@ -1309,3 +1314,179 @@ ready-made libraries is safe. We wrote Naive Bayes out by hand the way Lab 3 doe
 
 **Everything is trained on the train split only** — the vectorizers, the word vectors, the weights
 and the models. Dev is only ever scored, never learned from. 35 tests cover this step.
+
+---
+
+### 18.8 Step 11.6 (done) — Does the textbook cleanup actually help? (M10)
+
+**The question.** Every NLP course teaches the same three preparation steps: clean the text, throw
+away very common words ("stop words"), and cut words down to their root ("stemming"). Lab 1 teaches
+all three. But nobody in the lab ever checks whether they *help*. This step checks.
+
+**How.** We take the two best models from step 11.5 and retrain each one six times, changing only
+how the words were prepared:
+
+| Name | What it does |
+|---|---|
+| **V0** | no cleaning at all — just split on spaces. The lower bound |
+| **V1** | clean and tokenize properly. **This is the project's default** |
+| **V2** | V1, then drop common words (negation words kept on purpose) |
+| **V3** | V1, then stem |
+| **V4** | V1, then drop common words *and* stem |
+| **V2-demo** | V2, but negation and number words are dropped too — built to show the damage |
+
+Everything else is held fixed: same model, same seed, same split, same input format. So any change
+in the score comes from the word preparation and nothing else.
+
+**Run it yourself:**
+
+```bash
+python src/train_classical.py --ablation --table --log     # about 25 minutes, CPU only
+```
+
+**The result** (full table: `results/tables/table6_preprocessing_ablation.csv`)
+
+For TF-IDF + Logistic Regression:
+
+| Variant | overall | hard | **contradiction** |
+|---|---|---|---|
+| V0 — no cleaning | 0.542 | 0.592 | 0.742 |
+| **V1 — the default** | 0.549 | **0.610** | 0.712 |
+| V2 — drop common words | 0.544 | 0.596 | 0.710 |
+| V3 — stem | 0.551 | **0.610** | 0.742 |
+| V4 — drop + stem | 0.549 | **0.610** | 0.726 |
+| **V2-demo — negation dropped** | 0.530 | 0.609 | **0.528** ⚠️ |
+
+**Three things this says, in plain words.**
+
+**1. The textbook cleanup makes almost no difference.** Look at the first five rows: everything
+lands between 0.542 and 0.551, and three of them have exactly the same hard score, 0.610. Stemming
+(V3) is highest by 0.002 — but 0.002 on a single run is noise, not an improvement. The honest
+answer to "does stop-word removal and stemming help?" is **no, not measurably.** We keep V1 as the
+default and say so.
+
+**2. Throwing away "না" is the one thing that really hurts.** V2-demo is the same as V2 except it
+also deletes negation words (না, নয়, নেই) and number words (একটি, দুই, প্রথম). Its score on
+`contradiction` errors falls from **0.712 to 0.528** — it loses about a quarter of its ability to
+catch answers that say the opposite of the passage.
+
+That makes sense the moment you say it out loud. A `contradiction` error is often a single word.
+Here is a real pair from the dev split, not an invented example:
+
+> **question:** প্রদত্ত তথ্য অনুযায়ী "পরিবারের একমাত্র সন্তান তিনি" সম্পর্কে কী জানা যায়?
+> **correct answer:** পরিবারের একমাত্র সন্তান ছিলেন তিনি।
+> **wrong answer:** পরিবারের একমাত্র সন্তান ছিলেন **না** তিনি।
+
+The two answers differ by exactly one word. Delete "না" and they become *identical* — the model is
+handed two copies of the same sentence and told one is right and one is wrong. There is nothing
+left to learn from. This is why `configs/bn_protected_words.txt` exists, and this table is the
+evidence that it is doing a real job rather than being a precaution nobody tested.
+
+**3. The most important part: that damage is nearly invisible in the headline score.** Look at
+V2-demo's `hard` column — **0.609**, against the default's 0.610. One thousandth apart. If we had
+reported only the overall score or only the hard score, we would have concluded that deleting
+negation words costs nothing at all. The harm only appears when the results are broken down by
+error type.
+
+This is the clearest example in the whole project of why §12.1 insists on slicing the results
+instead of reporting one averaged number. A single number hid a 26% collapse.
+
+**One more finding.** For the word-vector model, dropping common words is actively harmful: it
+falls to **0.501** on hard questions, the worst cell in the table, and its best variant is V0 —
+*no cleaning whatsoever*. Skip-gram learns a word's meaning from the words sitting around it, so
+deleting the most frequent words punches holes in every piece of context it learns from.
+
+**And a fair reason to use the cleanup anyway.** V4 needs 201,504 features where V0 needs 259,454 —
+54,000 fewer columns for the same score. So the cleanup buys a smaller and faster model. That is a
+real benefit; it is just not the benefit the textbook claims.
+
+---
+
+### 18.9 The demo interface — seeing the models make a decision
+
+Everything up to here produces numbers in a table. This step makes the models usable: you
+type a question and an answer, and all twelve say what they think of it.
+
+**Start it:**
+
+```bash
+python src/serving.py --build     # once, about six minutes. Trains all 12 and saves them
+python src/app.py                 # then open http://127.0.0.1:8000
+```
+
+#### What the page shows
+
+The layout is two columns and fits on one laptop screen, so nothing needs scrolling. What you
+type stays on the left; what comes back fills the right.
+
+1. **The verdict count** — "8 of 12 models say this answer is correct". When the models
+   disagree, that is not the demo malfunctioning; it is what a set of models scoring 0.49 to
+   0.61 actually looks like.
+2. **Every model, ranked** — ranked by its **score on hard questions**, not by how confident it
+   sounds right now. Row 1 is the model with the best evidence behind it. A single prediction
+   proves nothing; the scores are what say whether a model is any good.
+3. **Two simple rules** — the exact and fuzzy string matchers, run on the same record. These
+   involve no learning at all.
+4. **The evidence** — does the answer appear in the passage, how many of its words are there,
+   how many letters would have to change. These are the exact numbers the *Similarity numbers*
+   model is given, not a separate explanation written for the page.
+
+What you typed is not repeated back to you: it is still sitting in the form on the left.
+
+Below that are eight real records from the dev split, each with both of its answers. Click
+either one to load it into the form.
+
+#### The thing worth showing your teacher
+
+Try this pair, which is one of the clickable examples:
+
+> **question:** ভারতীয় শাস্ত্রীয় সঙ্গীত অনুসারে মোট কতগুলি রাগ আছে?
+> **passage says:** মোট **৬৫টি** রাগ আছে
+> **answer given:** মোট **৬৭টি** রাগ আছে
+
+The answer changes 65 into 67. It is a `numeric` hallucination, and the correct verdict is
+*hallucinated*.
+
+**Eight of the twelve models call it correct.** So does the fuzzy string matcher — only 2% of
+the answer's letters have to change to find it in the passage, because the sentence is nearly
+identical. The plain exact-match rule is the one that gets it right, for the crude reason that
+"৬৭টি" does not appear anywhere in the passage.
+
+That single screen is the argument for the entire rest of the project: these models compare
+*shapes of text*. None of them can read a number out of a passage and check it against a
+number in an answer. That is what the neural models and the pretrained encoders are for.
+
+#### Why confidence is written three different ways
+
+You will see "52% sure it is correct", "leans correct by 0.31", and "score gap +0.001". These
+are not the same measurement dressed up differently:
+
+- **Logistic Regression, Naive Bayes and XGBoost** give a genuine probability.
+- **A linear SVM** only reports which side of its dividing line the record fell on, and how
+  far. That is not a probability and has no upper limit.
+- **The character language model** gives the gap between two likelihood scores.
+
+Printing all three as a percentage would invent a certainty that two of them never expressed.
+
+#### The scoreboard page
+
+`/models` ranks every model by the hard-subset score, with the rules alongside. It is read
+directly out of `results/experiment_log.csv` — the page cannot drift away from the results
+table, because it has no numbers of its own. Models that ran on three seeds are shown as the
+mean, exactly as Table 5 reports them.
+
+Note the colour rule: green means the model **beat** the fuzzy rule (0.591). Bag of Words +
+Logistic Regression lands on exactly 0.591, which is a tie, not a win — so it is grey. Only
+two of the twelve are genuinely above that line.
+
+#### One design rule behind all of this
+
+The demo does not build its own copy of the feature pipeline. It calls `fit_model()` in
+`src/train_classical.py` — the same function that produced the numbers in Table 5. If it had
+its own copy, the two would drift apart the first time either changed, and the demo would be
+showing predictions from a model nobody ever measured. There is a test that re-fits a model
+from scratch and checks the saved copy agrees with it on 200 dev records.
+
+The test split is not used anywhere in the demo. It trains on train, quotes dev scores, and
+the clickable examples come from dev. There is a test for that too — it parses both files and
+fails if either one so much as mentions loading `test`.

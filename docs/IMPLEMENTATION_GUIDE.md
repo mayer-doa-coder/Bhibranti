@@ -30,7 +30,7 @@
 | Further pretraining (M6) | ⬜ Not built yet | `src/further_pretrain.py` (planned) |
 | Scoring + result tables | ✅ Done — 28 tests pass; Table 5 written | `src/evaluate.py`, `tests/test_evaluate.py` |
 
-**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: steps 1–5 are done — Bengali text tools (§6), the hand-made features (§7.1a, §7.1b), the input formats (§6), the scoring code (§12), and the first real models (§7.1). Next is the M10 preprocessing experiment, then the neural models.**
+**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: steps 1–6 are done — Bengali text tools (§6), the hand-made features (§7.1a, §7.1b), the input formats (§6), the scoring code (§12), the first real models (§7.1, Table 5), and the M10 cleanup experiment (§6, Table 6). Next are the neural models.**
 
 ---
 
@@ -70,14 +70,15 @@ A free Kaggle GPU (T4 ×2 or P100, 30 hours/week) or Google Colab is enough for 
 ```bash
 pip install -q transformers datasets accelerate evaluate
 pip install -q scikit-learn pandas numpy scipy matplotlib seaborn
-pip install -q gensim              # Skip-gram / Word2Vec
+# gensim is NOT used: it has no build for Python 3.14, so Lab 3's Skip-gram is
+# written out in src/skipgram.py with numpy only
 pip install -q torch torchtext
 pip install -q sentencepiece protobuf
 pip install -q krippendorff        # human-agreement check
 pip install -q sacremoses regex
 pip install -q xgboost             # for M2
 pip install -q rapidfuzz           # fast edit-distance, for M12
-pip install -q statsmodels         # for the McNemar significance test
+# statsmodels is NOT needed: the McNemar test is written out in src/evaluate.py
 
 # Required specifically for BanglaBERT / BanglishBERT:
 pip install -q git+https://github.com/csebuetnlp/normalizer
@@ -403,6 +404,39 @@ Report overall score, hard-item score, and the `contradiction` error-type score 
 
 **All of this is built.** Every model gets its words through one call: `preprocess(text, variant="V1")` in `src/text_bn.py`.
 
+#### Table 6 — the result (`python src/train_classical.py --ablation --table --log`)
+
+Dev split, F2 input, seed 42. One model per family: `tfidf_logreg` (the joint-best M1) and `skipgram_mean_xgb` (the best M2). One seed rather than three, because this experiment is about the gap *between* variants, not the last thousandth of any one of them. Full table: `results/tables/table6_preprocessing_ablation.csv`.
+
+| Model | Variant | overall | **hard** | **contradiction** | numeric | relational | features |
+|---|---|---|---|---|---|---|---|
+| `tfidf_logreg` | V0 — no cleaning | 0.542 | 0.592 | 0.742 | 0.558 | 0.586 | 259,454 |
+| | **V1 — the default** | 0.549 | **0.610** | 0.712 | 0.561 | 0.581 | 215,601 |
+| | V2 — drop common words | 0.544 | 0.596 | 0.710 | 0.548 | 0.581 | 209,650 |
+| | V3 — stem | **0.551** | **0.610** | 0.742 | 0.573 | 0.571 | 207,385 |
+| | V4 — drop + stem | 0.549 | **0.610** | 0.726 | 0.555 | 0.586 | 201,504 |
+| | **V2-demo — negation dropped** | 0.530 | 0.609 | **0.528** ⚠️ | 0.549 | 0.570 | 209,054 |
+| `skipgram_mean_xgb` | V0 — no cleaning | **0.522** | 0.557 | 0.558 | 0.549 | 0.541 | 90.1% covered |
+| | V1 — the default | 0.519 | 0.557 | 0.513 | 0.539 | 0.493 | 94.0% |
+| | V2 — drop common words | 0.498 | **0.501** ⚠️ | 0.528 | 0.509 | 0.440 | 92.7% |
+| | V3 — stem | 0.515 | 0.523 | 0.552 | 0.533 | 0.542 | 94.5% |
+| | V4 — drop + stem | **0.522** | 0.568 | 0.633 | 0.534 | 0.533 | 93.2% |
+| | V2-demo — negation dropped | 0.518 | 0.557 | 0.491 | 0.513 | 0.531 | 92.6% |
+
+**What it says.**
+
+1. **The classic cleanup is worth almost nothing here.** Across V0–V4, `tfidf_logreg` moves between 0.542 and 0.551 overall and its hard score sits at 0.610 for three of the five. Stemming (V3) is nominally best at 0.551, but 0.002 above the default on one seed is not a result — it is noise, and the honest report is "no measurable difference". The textbook pipeline of stop-word removal and stemming, applied to this task, **does not earn its place.**
+
+2. **V2-demo is the finding, and it is a large one.** Dropping negation and number words costs `tfidf_logreg` **0.184 on `contradiction`** (0.712 → 0.528), a 26% relative collapse. That is not noise — it is four times the entire spread of every other variant combined.
+
+3. **And that damage is nearly invisible in the headline numbers.** V2-demo's overall score is 0.530 and its hard score 0.609 — the hard score is *within 0.001 of the default*. Anyone reading only the overall or hard column would conclude the negation words did not matter. The damage shows up in exactly one place: the error type that depends on the word "না". This is the strongest argument in the project for slicing results by error type rather than reporting one averaged number (§12.1).
+
+4. **Stop-word removal actively hurts the word vectors.** `skipgram_mean_xgb` drops to 0.501 on hard under V2 — the worst cell in the table. Skip-gram learns from which words sit near which; deleting the most frequent words tears holes in every context window it trains on. Notably V0, with no cleaning at all, is its joint-best variant.
+
+5. **Fewer features, same score.** V4 uses 54,000 fewer columns than V0 (201,504 vs 259,454) for an identical overall score. So the cleanup buys a smaller, faster model — just not a better one. That is a legitimate reason to use it, and not the reason the textbook gives.
+
+**Decision: V1 stays the default**, unchanged. V3's 0.002 is not grounds for a switch, and V1 is the variant every earlier result was measured under.
+
 ```bash
 python src/text_bn.py "কলেজের ছাত্ররা বইটি পড়েনি।"   # see every step on one sentence
 python src/text_bn.py --demo                          # see every step on 5 examples
@@ -491,7 +525,7 @@ These are quick to build, give you a working pipeline in an afternoon, and their
 | M3 | BiLSTM + attention | Adds dot-product attention over the hidden states | 4 | attention weights on 20 dev items |
 | M13 | Transformer built from scratch | See §7.1d below | 5 | — |
 
-**Built and run** (`python src/train_classical.py --all --seeds`). Dev results, F2 input, V1 preprocessing. The `hard` column is the PRD G4 target; `±` is the spread over three seeds where the model has randomness in it.
+**Built and run** (`python src/train_classical.py --all --seeds`). Dev results, F2 input, V1 preprocessing. The M1 rows were re-measured on 2026-09-19 after a fix: each part's column had been picking up the `<SEP>` marker that belongs only in a flat sequence. It moved the scores by at most 0.014 - and not at all for TF-IDF, which gives a token appearing in every document almost no weight. The `hard` column is the PRD G4 target; `±` is the spread over three seeds where the model has randomness in it.
 
 | Model | Lab | dev macro-F1 | has-context + **hard** |
 |---|---|---|---|
@@ -501,18 +535,18 @@ These are quick to build, give you a working pipeline in an afternoon, and their
 | Skip-gram TF-IDF + XGBoost | 3 | 0.520 ±0.007 | 0.518 |
 | TF-IDF + Naive Bayes | 2, 3 | 0.527 | 0.592 |
 | Character n-gram LM (M11) | 2 | 0.529 | 0.605 |
-| BoW + Naive Bayes | 2, 3 | 0.532 | 0.601 |
-| BoW + SVM | 2 | 0.544 | 0.560 | 
-| TF-IDF + SVM | 2 | 0.550 | 0.610 |
-| **TF-IDF + LogReg** | 2, 3 | 0.554 | **0.624 — best on the target** |
-| BoW + LogReg | 2, 3 | 0.557 | 0.592 |
+| BoW + Naive Bayes | 2, 3 | 0.529 | 0.596 |
+| BoW + SVM | 2 | 0.542 ⚠️ | 0.559 |
+| **TF-IDF + SVM** | 2 | 0.548 | **0.610 — joint best** |
+| **TF-IDF + LogReg** | 2, 3 | 0.549 | **0.610 — joint best on the target** |
+| BoW + LogReg | 2, 3 | 0.559 | 0.591 |
 | **Similarity features (M12)** | 1, 2, 3 | **0.730 — best overall** | **0.490 — near worst** |
 | *the bars to clear* | | | *exact 0.487 · fuzzy 0.591* |
 
 **Four things this table says.**
 
 1. **The best overall model is the least useful one.** M12 tops the table at 0.730, but its heaviest weight is `exact_in_passage (+1.95)`, it matches the string matcher *exactly* on has-context (0.850 = 0.850), and on hard it drops to 0.490 — below the fuzzy rule. It learned the shortcut, which is precisely what §3.3 warned about and why the hard column exists.
-2. **Only TF-IDF + LogReg (0.624) and TF-IDF + SVM (0.610) clear both bars on hard** (0.487 exact, 0.591 fuzzy). They are the real result here.
+2. **Only TF-IDF + LogReg and TF-IDF + SVM clear both bars on hard** (0.487 exact, 0.591 fuzzy). They tie at **0.610**, and it is a real tie, not a rounding coincidence: on the 218 hard records they disagree on 28, and each is right on exactly 14 of them (McNemar p = 1.000). Reported as a tie, per §12.2.
 3. **Skip-gram is the weakest family (0.50–0.52).** 345,000 words of training text is tiny for word vectors, and averaging them throws word order away. The seed spread is small (±0.002–0.013), so this is not noise.
 4. **Everything lands in the 0.50–0.65 band §12.3 predicted.** No pretraining, no surprise.
 
@@ -1020,7 +1054,7 @@ Without this, you can't honestly claim model A beats model B if they only differ
 **Table 3** — per error-type score (dev/test only)
 **Table 4** — normalisation × input-format experiment
 **Table 5** — safety-check results (surface-feature check, answer-only check, both string baselines)
-**Table 6** — cleanup experiment (M10): the V0–V4 + V2-demo variants
+**Table 6** — cleanup experiment (M10): the V0–V4 + V2-demo variants ✅ **done** → `results/tables/table6_preprocessing_ablation.csv`, written up in §6
 **Table 7** — word-order test (M14): score change per model, per error type
 **Table 8** — per-subject score, for the best model at each rung of the ladder
 
@@ -1033,7 +1067,7 @@ Without this, you can't honestly claim model A beats model B if they only differ
 | Week | What happened / what's next |
 |---|---|
 | 1–3 *(done)* | Licences checked, schema frozen, corpus built and filtered, annotation done, human agreement measured, splits locked |
-| **4** *(under way)* | ✅ `text_bn.py`, `features.py` (M11/M12 + V6 baseline), `preprocess.py`, `evaluate.py`. ⬜ Still to train: M1, M2, and the M10 cleanup experiment |
+| **4** *(done)* | ✅ `text_bn.py`, `features.py` (M11/M12 + V6 baseline), `preprocess.py`, `evaluate.py`, and `train_classical.py` + `skipgram.py` — M1, M2, M11 and M12 are all trained (Table 5), and the M10 cleanup experiment is run (Table 6) |
 | **5** | Build M3 (recurrent models) and M13 (Transformer from scratch); start the first pretrained models (M4/M5); sweep input formats (M9) |
 | **6** | Further pretraining; combining models; threshold tuning; AI reference point; the word-order test (M14); final safety check; produce all 8 result tables |
 
@@ -1054,7 +1088,55 @@ Without this, you can't honestly claim model A beats model B if they only differ
 
 ---
 
-## 15. Background reading
+## 15. The demo interface
+
+Built after the classical ladder, so that the models can be used and not only tabulated.
+Beginner-level walkthrough in §18.9 of `PROJECT_WALKTHROUGH.md`.
+
+```bash
+python src/serving.py --build     # once, ~6 min CPU: fit all 12 models, cache them
+python src/app.py                 # http://127.0.0.1:8000
+```
+
+Flask, Jinja2 and joblib only — no metrics stack, no containers, nothing to start besides the
+one server.
+
+### 15.1 What it serves
+
+| Page | Shows |
+|---|---|
+| `/` | Type question + answer (+ optional passage). All 12 models judge it, ranked by dev hard score, beside the M12 evidence and both rule baselines |
+| `/models` | The scoreboard, read from `results/experiment_log.csv` and averaged over seeds |
+| `/health` | Readiness check (models loaded or not) |
+
+Two-column layout: input on the left, results on the right. Measured at **576px** of height,
+so it fits a laptop screen without scrolling.
+
+### 15.2 Three rules the implementation follows
+
+1. **Serving and training are one code path.** `train_and_predict` was split into
+   `fit_model()` and `FittedModel.predict()`; the demo calls `fit_model()`. If serving rebuilt
+   the feature pipeline itself, the two would drift the first time either changed and the demo
+   would show predictions from a model nobody measured. The split was verified
+   behaviour-preserving: `tfidf_logreg` still scores 0.549 / 0.610 with 215,601 features.
+2. **The page owns no numbers.** Every score comes from the experiment log. A model run on
+   three seeds is shown as the mean, so the page cannot contradict Table 5.
+3. **The test split is unreachable.** A test parses `serving.py` and `app.py` with the AST —
+   stripping docstrings, which discuss the rule at length — and fails if either loads `test`.
+
+### 15.3 What the demo is good for pedagogically
+
+The clearest single screen is a `numeric` hallucination: a passage saying ৬৫টি against an
+answer saying ৬৭টি. **Eight of the twelve models call it correct**, and so does the fuzzy
+matcher — only 2% of the answer's characters differ. Only the exact-match rule gets it right,
+and only because the string "৬৭টি" is absent.
+
+It demonstrates the project's premise in one view: these models compare shapes of text, and
+none of them can read a number out of a passage and check it against a number in an answer.
+
+---
+
+## 16. Background reading
 
 **Read these first:**
 - **BanTH** (arXiv 2410.13281) — transliterated Bangla, further-pretraining recipe, full baseline table. Our closest template.

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}BangHallu{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <h1>BangHallu</h1>
+    <p class="sub">Is this Bengali answer true, or made up?</p>
+    <nav>
+      <a href="/" class="{% block nav_check %}{% endblock %}">Check an answer</a>
+      <a href="/models" class="{% block nav_models %}{% endblock %}">Model scores</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="wrap">
+  <p>
+    <strong>1 = correct, 0 = made up.</strong>
+    Models learned from the <code>train</code> set. Scores come from <code>dev</code>.
+    The <code>test</code> set is saved for the end and is not used here.
+  </p>
+</footer>
+
+</body>
+</html>

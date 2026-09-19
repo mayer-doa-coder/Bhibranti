@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Check an answer &mdash; BangHallu{% endblock %}
+{% block nav_check %}here{% endblock %}
+
+{% block content %}
+<div class="layout">
+
+  <!-- ============================ LEFT: what you type ============================ -->
+  <aside>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <form class="check block" method="post" action="/predict">
+      <div class="field">
+        <label for="question">Question</label>
+        <input type="text" id="question" name="question" class="bn"
+               value="{{ form.question if form else request.args.get('question', '') }}">
+      </div>
+
+      <div class="field">
+        <label for="answer">Answer to check</label>
+        <input type="text" id="answer" name="answer" class="bn" required
+               value="{{ form.answer if form else request.args.get('answer', '') }}">
+      </div>
+
+      <div class="field">
+        <label for="passage">Passage <span style="text-transform:none">(optional)</span></label>
+        <textarea id="passage" name="passage" rows="2" class="bn">{{ form.passage if form else request.args.get('passage', '') }}</textarea>
+      </div>
+
+      <button type="submit">Check it</button>
+    </form>
+
+    <div class="block grow">
+      <h2>Or click a real example</h2>
+      <div class="examples">
+        {% for e in examples %}
+        <div class="row">
+          <span class="q bn" title="{{ e.question }}">{{ e.question }}</span>
+          <div class="pair">
+            <a class="pick ok bn" title="True answer &mdash; {{ e.correct_answer }}"
+               href="/?question={{ e.question|urlencode }}&amp;answer={{ e.correct_answer|urlencode }}&amp;passage={{ e.passage|urlencode }}">{{ e.correct_answer }}</a>
+            <a class="pick bad bn" title="Made-up answer ({{ e.error_type }}) &mdash; {{ e.wrong_answer }}"
+               href="/?question={{ e.question|urlencode }}&amp;answer={{ e.wrong_answer|urlencode }}&amp;passage={{ e.passage|urlencode }}">{{ e.wrong_answer }}</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="note" style="margin-top:4px">Green = true. Red = made up. Click either.</p>
+    </div>
+
+  </aside>
+
+  <!-- ============================ RIGHT: what comes back ============================ -->
+  <section>
+
+  {% if not results %}
+
+    <div class="empty">
+      <h2>How this works</h2>
+      <ol>
+        <li>Put in a question and an answer. Add the passage if you have one.</li>
+        <li>All {{ model_count }} models check it and say <strong>correct</strong> or <strong>made up</strong>.</li>
+        <li>You also see <em>why</em>: does the answer appear in the passage, how close is it, and what two simple rules say.</li>
+      </ol>
+      <p class="note" style="margin-top:10px">
+        These are the simple models &mdash; they count words and compare text. They score about
+        0.50 to 0.61, where 0.50 is a coin toss. They often disagree. That is the real result,
+        not a fault. <a href="/models">See the scores</a>.
+      </p>
+    </div>
+
+  {% else %}
+
+    <div class="headline">
+      <span class="count">{{ results.saying_correct }}<span class="of">/{{ results.total }}</span></span>
+      <span class="says">
+        models say this answer is <strong>correct</strong>.
+        {% if results.saying_correct == results.total %}All of them agree.
+        {% elif results.saying_correct == 0 %}All of them say it is made up.
+        {% else %}They disagree, which is normal on hard questions.{% endif %}
+      </span>
+      <span class="timing">{{ "%.0f"|format(results.total_ms) }} ms total</span>
+    </div>
+
+    {% if results.divergent %}
+    <div class="warnstrip">
+      <strong>The simple rule says
+        {{ "correct" if results.rule_verdict == 1 else "made up" }},
+        most models say
+        {{ "correct" if results.majority == 1 else "made up" }}.</strong>
+      No model here can read a passage and check a fact against it. So on easy questions a
+      two-line rule beats nearly all of them. That is why this project scores on the
+      <em>hard</em> questions.
+    </div>
+    {% endif %}
+
+    <div class="results-grid">
+
+      <div>
+        <h2>All {{ results.total }} models</h2>
+        <div class="grow stretch">
+        <table>
+          <thead>
+            <tr>
+              <th class="num">#</th>
+              <th>Model</th>
+              <th>Says</th>
+              <th>How sure</th>
+              <th class="num">score</th>
+              <th class="num">ms</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in results.predictions %}
+            {% set rank = results.ranked.get(p.model) %}
+            <tr {% if loop.first %}class="leader"{% endif %}>
+              <td class="num">{{ rank.rank if rank else "-" }}</td>
+              <td class="model" title="Looks at: {{ p.sees }}">{{ p.title }}{% if p.unreliable %}<span class="tag">unreliable</span>{% endif %}<span class="why">sees: {{ p.sees }}</span></td>
+              <td class="verdict {{ 'correct' if p.verdict == 1 else 'wrong' }}">{{ "correct" if p.verdict == 1 else "made up" }}</td>
+              <td class="note">{{ p.confidence_text }}</td>
+              <td class="num">{{ "%.3f"|format(rank.hard) if rank and rank.hard else "-" }}</td>
+              <td class="num">{{ "%.1f"|format(p.milliseconds) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <p class="note" style="margin-top:4px">
+          Sorted by <strong>score</strong>: how well each model did on hard questions in testing.
+          Row 1 is the most trustworthy, not the loudest.
+        </p>
+      </div>
+
+      <div>
+        <h2>Two simple rules</h2>
+        <table>
+          <tbody>
+            {% for rule in results.rules %}
+            <tr>
+              <td title="{{ rule.rule }}: {{ rule.why }}">{{ rule.short }}</td>
+              <td class="verdict {{ 'none' if rule.verdict is none else ('correct' if rule.verdict == 1 else 'wrong') }}">
+                {% if rule.verdict is none %}no passage
+                {% elif rule.verdict == 1 %}correct
+                {% else %}made up{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <h2 style="margin-top:12px">Evidence</h2>
+        <table>
+          <tbody>
+            {% for row in results.evidence %}
+            <tr>
+              <td>{{ row.what }}</td>
+              <td class="num {{ 'note' if row.missing else '' }}">{{ row.value }}</td>
+              <td class="num note">{{ row.raw if row.raw is not none else "" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="note" style="margin-top:4px">
+          The exact numbers the <em>Similarity numbers</em> model is given. Each compares the
+          record only with its own question and passage.
+        </p>
+
+        {# What was checked is already on screen, in the form on the left. Repeating it here
+           cost about 170px of height and told the reader nothing new. #}
+        {% if not results.record.context %}
+        <p class="note" style="margin-top:8px">
+          <strong>No passage given.</strong> The models have nothing to check against, so they
+          can only judge how the answer is written. Scores are much lower this way.
+        </p>
+        {% endif %}
+
+        {# Fills the rest of this column on a tall window with something worth reading,
+           rather than stretching seven table rows across the gap. #}
+        <div class="grow tall-only">
+          <h2 style="margin-top:12px">How to read this</h2>
+          <p><strong>Why they disagree so much.</strong> These models count words and compare
+          text. They cannot look up a fact. On hard questions they score near 0.50, which is a
+          coin toss, so a split vote is the normal result.</p>
+          <p><strong>Why row 1 is not always right.</strong> The list is ordered by past
+          performance, not by confidence today. The best model here still gets about 4 hard
+          questions in 10 wrong.</p>
+          <p><strong>What would fix it.</strong> A model that can line the answer up against
+          the passage and check the parts that matter &mdash; that is the next step of the
+          project.</p>
+        </div>
+      </div>
+
+    </div>
+
+  {% endif %}
+
+  </section>
+</div>
+{% endblock %}
