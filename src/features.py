@@ -326,7 +326,16 @@ def is_word_token(token: str) -> bool:
     return any(ch.isalnum() for ch in token)
 
 
-def extract_features(record: dict, order: int = NGRAM_ORDER) -> dict[str, float]:
+def cosine(a, b) -> float:
+    """How similar two vectors point, from -1 to 1 (Lab 3). 0 when either is empty."""
+    import numpy as np
+    size_a, size_b = float(np.linalg.norm(a)), float(np.linalg.norm(b))
+    if size_a == 0.0 or size_b == 0.0:
+        return 0.0
+    return float(np.dot(a, b) / (size_a * size_b))
+
+
+def extract_features(record: dict, order: int = NGRAM_ORDER, vectors=None) -> dict[str, float]:
     """All of a record's similarity features, in one dictionary.
 
     Every value compares the record with ITSELF - its own question and its own passage.
@@ -341,6 +350,12 @@ def extract_features(record: dict, order: int = NGRAM_ORDER) -> dict[str, float]
         has_context       1 = a passage exists
         answer_len        characters in the answer
         digit_share       share of the answer that is digits
+
+    Pass `vectors` (a trained SkipGram) to add two more, from Lab 3:
+        cos_passage       1 = the answer means much the same as the passage
+        cos_question      1 = the answer means much the same as the question
+    These catch a match in MEANING where the letters differ, which the other
+    numbers here cannot see. They need word vectors, so they arrive with M2.
     """
     answer = clean(record["candidate_answer"])
     question = clean(record["question"])
@@ -352,6 +367,15 @@ def extract_features(record: dict, order: int = NGRAM_ORDER) -> dict[str, float]
         "digit_share": sum(ch.isdigit() for ch in answer) / len(answer) if answer else 0.0,
         "edit_question": normalised_best_match(answer, question) if question else 1.0,
     }
+
+    if vectors is not None:
+        from text_bn import preprocess as tokenise
+        answer_vector = vectors.document_vector(tokenise(answer))
+        features["cos_question"] = cosine(answer_vector,
+                                          vectors.document_vector(tokenise(question)))
+        features["cos_passage"] = (cosine(answer_vector,
+                                          vectors.document_vector(tokenise(passage)))
+                                   if passage else 0.0)
 
     if not passage:
         features.update(NO_PASSAGE)
@@ -374,10 +398,20 @@ def extract_features(record: dict, order: int = NGRAM_ORDER) -> dict[str, float]
 FEATURE_NAMES = ["exact_in_passage", "edit_passage", "edit_question", "token_overlap",
                  "lm_passage", "has_context", "answer_len", "digit_share"]
 
+# The two extra numbers that need word vectors (M2). Kept separate so the base set
+# stays usable before the vectors are trained.
+COSINE_FEATURE_NAMES = ["cos_passage", "cos_question"]
 
-def feature_matrix(records: list[dict], order: int = NGRAM_ORDER) -> np.ndarray:
-    """Features for many records, as rows in the fixed FEATURE_NAMES order."""
-    return np.array([[extract_features(r, order)[name] for name in FEATURE_NAMES]
+
+def feature_names(vectors=None) -> list[str]:
+    """The feature names, in a fixed order, with or without the word-vector ones."""
+    return FEATURE_NAMES + (COSINE_FEATURE_NAMES if vectors is not None else [])
+
+
+def feature_matrix(records: list[dict], order: int = NGRAM_ORDER, vectors=None) -> np.ndarray:
+    """Features for many records, one row each, in the order feature_names() gives."""
+    names = feature_names(vectors)
+    return np.array([[extract_features(r, order, vectors)[name] for name in names]
                      for r in records], dtype=np.float64)
 
 

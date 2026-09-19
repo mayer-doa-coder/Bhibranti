@@ -81,7 +81,13 @@ dev 619 / 1,238 · test 614 / 1,228.
       degenerate); McNemar is written out because statsmodels is not a dependency. Adds an
       explicit `has-context + hard` row - the PRD G4 target. `--split test` refuses without
       `--final`. 28 tests pass.
-- [ ] Model ladder: next is `src/train_classical.py` (M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram)
+- [x] **M4 step 5 - `src/train_classical.py` + `src/skipgram.py`** (Labs 2-3): the first models
+      that learn. M1 BoW/TF-IDF x NB/LogReg/SVM, M11 char LM, M2 Skip-gram x LogReg/XGBoost,
+      M12 similarity features. **gensim has no Python 3.14 build, so Skip-gram is written out
+      from Lab 3** (negative sampling instead of full softmax); its neighbours are sensible
+      (1971 -> মার্চ, জিয়াউর; সরকার -> মুজিবনগর, প্রবাসী) and it covers 94% of dev words.
+      Lab-vs-library Naive Bayes check: **100% agreement**. 35 tests pass.
+- [ ] Model ladder: next is the M10 preprocessing experiment, then `src/train_neural.py`
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
 knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
@@ -159,6 +165,14 @@ python src/evaluate.py --demo                   # what the numbers mean, on made
 python src/evaluate.py --baselines --table      # score the no-learning rules -> results/tables/
 python src/evaluate.py --baselines --split test --final   # ONLY at M6, once, ever
 
+# M4 step 5 - the first models that learn (CPU only, no GPU)
+python src/skipgram.py --train                   # ~3 min; writes data/processed/skipgram_s42.npz
+python src/skipgram.py --check                   # are the word neighbours sensible?
+python src/train_classical.py --model tfidf_logreg          # one model, full report
+python src/train_classical.py --all --seeds --log           # every model, 3 seeds, recorded
+python src/train_classical.py --model tfidf_logreg --variant V2   # M10 ablation
+python src/train_classical.py --lab-check        # our Naive Bayes vs the library's
+
 # Not yet written (M4-M6) - see guide §1.3 for the planned modules
 python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
 python src/train_classical.py    --model tfidf_nb --variant V2       # M10 preprocessing ablation
@@ -198,7 +212,9 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `tests/test_features.py` | ✅ One test per feature rule — run after any change to `features.py` |
 | `src/preprocess.py` | ✅ Input formats F1/F2/F3. `as_tokens()` for classical models, `format_record()` for encoders. Cuts the passage only |
 | `tests/test_preprocess.py` | ✅ One test per formatting rule |
-| `src/train_classical.py` | ⬜ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3) |
+| `src/train_classical.py` | ✅ M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram + LR/XGB, M11, M12 (Labs 2–3). `--all` compares them |
+| `src/skipgram.py` | ✅ Lab 3's Skip-gram, written out. Vectors are per-seed: `data/processed/skipgram_s42.npz` |
+| `tests/test_skipgram.py` · `tests/test_train_classical.py` | ✅ 35 tests for the word vectors and the training harness |
 | `src/train_neural.py` | ⬜ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5) |
 | `src/train_transformer.py` | ⬜ Pretrained encoder fine-tuning (M4/M5) |
 | `src/further_pretrain.py` | ⬜ MLM further pretraining (mBERT / XLM-R only) |

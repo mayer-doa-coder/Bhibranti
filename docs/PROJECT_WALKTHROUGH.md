@@ -1248,3 +1248,64 @@ because the test set may be used only once, right at the end.
 **Proof it works.** It already scored the no-learning rules on dev: the exact-match rule gets 0.850
 *with* a passage but 0.333 *without* one, and only 0.487 on the target group. 28 tests check the
 arithmetic against answers worked out by hand, and the results match scikit-learn exactly.
+
+### 18.7 Step 11.5 (done) — The first models that actually learn, `src/train_classical.py`
+
+**What.** Twelve models, all trained on a laptop with no GPU, in seconds to minutes each. This is
+the first point where the project produces real scores.
+
+| Family | What it does | Lab |
+|---|---|---|
+| **M1** counting words | Counts which words appear, then learns which words go with wrong answers. Three learners: Naive Bayes, Logistic Regression, SVM | 2, 3 |
+| **M11** language model | One model of how correct answers are written, one of how wrong ones are | 2 |
+| **M2** word vectors | Learns a list of numbers per word from our own text, then averages them per answer | 3 |
+| **M12** similarity numbers | Uses the measurements from step 11.2 (does the answer appear in the passage, how close is it) | 1, 2, 3 |
+
+**The word vectors, built from scratch.** The library the guide named (`gensim`) has no version for
+our Python, and Lab 3 teaches how to write Skip-gram by hand anyway — so we did. It reads our text
+and learns which words keep similar company. It works:
+
+| Word | What the model thinks is related |
+|---|---|
+| ১৯৭১ | মার্চ, জিয়াউর, ১৯৭২ |
+| সরকার (government) | মুজিবনগর, প্রবাসী, গঠন |
+| কবি (poet) | দাশ, শরৎচন্দ্র, সাহিত্যিক |
+| ঢাকা | চট্টগ্রাম, বিশ্ববিদ্যালয় |
+
+Nobody told it any of that — it worked it out from which words appear near each other.
+
+**The results, and the one that matters most**
+
+| Model | Score overall | Score on **hard** questions |
+|---|---|---|
+| Similarity numbers (M12) | **0.730 — the best** | **0.490 — nearly the worst** |
+| TF-IDF + Logistic Regression | 0.554 | **0.624 — the best** |
+| Word vectors (M2) | 0.503–0.520 | 0.500–0.529 |
+| *the two rules to beat* | | *0.487 and 0.591* |
+
+**Read that top row carefully, because it is the whole lesson of this project.** The model with the
+best overall score is the *least* useful one. Given the "does the answer appear in the passage?"
+measurement, it leaned on it almost entirely — and on hard questions, where that trick stops
+working, it fell to 0.490, below even the simple fuzzy rule.
+
+Meanwhile TF-IDF + Logistic Regression looks mediocre overall (0.554) but is the **only** kind of
+model that clearly beats both rules on hard questions (0.624 against 0.487 and 0.591). If we had
+judged by the overall number alone, we would have picked the wrong model.
+
+**Two honest problems we report rather than hide**
+
+- **Bag of Words + SVM never finishes settling.** Raw word counts here go up to 55 with no ceiling,
+  and the SVM cannot converge on that even after 20,000 attempts. TF-IDF, which scales everything
+  to at most 1, converges in seconds. Its score is therefore marked "unreliable" in the output and
+  in the log. This is a neat demonstration of *why* TF-IDF's weighting is worth having.
+- **The word vectors are the weakest family.** 345,000 words is a small amount of text to learn
+  from — real word2vec uses billions — and averaging a sentence's vectors throws word order away.
+  Running them on three different random starts changes the score by only ±0.002 to ±0.013, so this
+  is a real limitation, not luck.
+
+**Checking our code against the library's.** The guide asks us to prove the shortcut of using
+ready-made libraries is safe. We wrote Naive Bayes out by hand the way Lab 3 does, and it predicts
+**the same label on 100% of 200 dev records** as scikit-learn's version, with an identical score.
+
+**Everything is trained on the train split only** — the vectorizers, the word vectors, the weights
+and the models. Dev is only ever scored, never learned from. 35 tests cover this step.

@@ -153,7 +153,8 @@ project/
 |   |-- text_bn.py                         OK   Bengali cleaning/tokenizer/stop words/stemmer (Lab 1); --check
 |   |-- features.py                        OK   M11 char n-gram LM, M12 edit distance, V6 baseline (Labs 1-3)
 |   |-- preprocess.py                      OK   input formats F1/F2/F3; cuts the passage only
-|   |-- train_classical.py                 TODO M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram, M11, M12 (Labs 2-3)
+|   |-- skipgram.py                        OK   Lab 3's Skip-gram written out (no gensim on 3.14)
+|   |-- train_classical.py                 OK   M1 BoW/TF-IDF + NB/LR/SVM, M2 Skip-gram, M11, M12 (Labs 2-3)
 |   |-- train_neural.py                    TODO M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4-5)
 |   |-- train_transformer.py               TODO pretrained encoder fine-tuning (M4/M5)
 |   |-- further_pretrain.py                TODO MLM further pretraining (mBERT / XLM-R only)

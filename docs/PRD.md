@@ -22,7 +22,7 @@ Read this table first. It tells you what is done and what is next, without diggi
 | Annotation pilot | Testing that two humans agree on labels | ✅ Done — agreement score 0.717 |
 | Full annotation | Humans checking every test/dev item and a slice of train | ✅ Done — agreement score 0.865 on test |
 | Merge + cleanup | Writing human labels into the corpus, removing 180 bad pairs | ✅ Done |
-| **Model ladder** | **Training and testing all the required models** | 🔶 **In progress** — 4 of 11 steps done: Bengali text tools, the hand-made features + V6 baseline, the three input formats, and the scoring code. Next: the first models (`src/train_classical.py`) |
+| **Model ladder** | **Training and testing all the required models** | 🔶 **In progress** — 5 of 11 steps done: Bengali text tools, the hand-made features + V6 baseline, the three input formats, the scoring code, and the first learning models (M1, M2, M11, M12). Next: the M10 preprocessing experiment, then the neural models |
 | Final evaluation | Scoring the locked test set exactly once | ⬜ Not started |
 
 **In one sentence: the dataset is finished and verified. Model building has started (text tools done); the models themselves come next.**

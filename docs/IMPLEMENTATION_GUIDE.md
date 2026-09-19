@@ -24,13 +24,13 @@
 | Bengali text cleanup tools | ✅ Done — 27 tests pass, `--check` passes on train+dev | `src/text_bn.py`, `tests/test_text_bn.py` |
 | Hand-made features (n-gram LM, edit distance) | ✅ Done — 24 tests pass; V6 baseline measured | `src/features.py`, `tests/test_features.py` |
 | Input-format builder | ✅ Done — 22 tests pass; answer/question never truncated | `src/preprocess.py`, `tests/test_preprocess.py` |
-| Simple models (M1, M2, M11, M12) | ⬜ Not built yet | `src/train_classical.py` (planned) |
+| Simple models (M1, M2, M11, M12) | ✅ Done — 35 tests pass; first real scores | `src/train_classical.py`, `src/skipgram.py` |
 | Neural models (M3, M13) | ⬜ Not built yet | `src/train_neural.py` (planned) |
 | Pretrained transformers (M4/M5) | ⬜ Not built yet | `src/train_transformer.py` (planned) |
 | Further pretraining (M6) | ⬜ Not built yet | `src/further_pretrain.py` (planned) |
 | Scoring + result tables | ✅ Done — 28 tests pass; Table 5 written | `src/evaluate.py`, `tests/test_evaluate.py` |
 
-**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: steps 1–4 are done — Bengali text tools (§6), the hand-made features (§7.1a, §7.1b), the input formats (§6) and the scoring code (§12). Next is `src/train_classical.py`, the first real models.**
+**In short: the data side of this guide (sections 1–5) is finished and just needs to be understood. The model side (sections 6–12) has started: steps 1–5 are done — Bengali text tools (§6), the hand-made features (§7.1a, §7.1b), the input formats (§6), the scoring code (§12), and the first real models (§7.1). Next is the M10 preprocessing experiment, then the neural models.**
 
 ---
 
@@ -110,7 +110,8 @@ Bhibranti/
 │   ├── text_bn.py                  ✅ Bengali cleanup + tokenizer + stop words + stemmer
 │   ├── features.py                 ✅ the n-gram language model + similarity features
 │   ├── preprocess.py               ✅ builds the 3 input formats
-│   ├── train_classical.py          ⬜ M1, M2, M11, M12
+│   ├── skipgram.py                 ✅ Lab 3's Skip-gram, written out (gensim has no 3.14 build)
+│   ├── train_classical.py          ✅ M1, M2, M11, M12
 │   ├── train_neural.py             ⬜ M3, M13
 │   ├── train_transformer.py        ⬜ M4, M5
 │   ├── further_pretrain.py         ⬜ M6
@@ -489,6 +490,38 @@ These are quick to build, give you a working pipeline in an afternoon, and their
 | M3 | Stacked BiLSTM | 2 layers, 256 hidden units, 30% dropout | 4 | — |
 | M3 | BiLSTM + attention | Adds dot-product attention over the hidden states | 4 | attention weights on 20 dev items |
 | M13 | Transformer built from scratch | See §7.1d below | 5 | — |
+
+**Built and run** (`python src/train_classical.py --all --seeds`). Dev results, F2 input, V1 preprocessing. The `hard` column is the PRD G4 target; `±` is the spread over three seeds where the model has randomness in it.
+
+| Model | Lab | dev macro-F1 | has-context + **hard** |
+|---|---|---|---|
+| Skip-gram mean + XGBoost | 3 | 0.503 ±0.013 | 0.529 |
+| Skip-gram TF-IDF + LogReg | 3 | 0.506 ±0.003 | 0.515 |
+| Skip-gram mean + LogReg | 3 | 0.508 ±0.002 | 0.500 |
+| Skip-gram TF-IDF + XGBoost | 3 | 0.520 ±0.007 | 0.518 |
+| TF-IDF + Naive Bayes | 2, 3 | 0.527 | 0.592 |
+| Character n-gram LM (M11) | 2 | 0.529 | 0.605 |
+| BoW + Naive Bayes | 2, 3 | 0.532 | 0.601 |
+| BoW + SVM | 2 | 0.544 | 0.560 | 
+| TF-IDF + SVM | 2 | 0.550 | 0.610 |
+| **TF-IDF + LogReg** | 2, 3 | 0.554 | **0.624 — best on the target** |
+| BoW + LogReg | 2, 3 | 0.557 | 0.592 |
+| **Similarity features (M12)** | 1, 2, 3 | **0.730 — best overall** | **0.490 — near worst** |
+| *the bars to clear* | | | *exact 0.487 · fuzzy 0.591* |
+
+**Four things this table says.**
+
+1. **The best overall model is the least useful one.** M12 tops the table at 0.730, but its heaviest weight is `exact_in_passage (+1.95)`, it matches the string matcher *exactly* on has-context (0.850 = 0.850), and on hard it drops to 0.490 — below the fuzzy rule. It learned the shortcut, which is precisely what §3.3 warned about and why the hard column exists.
+2. **Only TF-IDF + LogReg (0.624) and TF-IDF + SVM (0.610) clear both bars on hard** (0.487 exact, 0.591 fuzzy). They are the real result here.
+3. **Skip-gram is the weakest family (0.50–0.52).** 345,000 words of training text is tiny for word vectors, and averaging them throws word order away. The seed spread is small (±0.002–0.013), so this is not noise.
+4. **Everything lands in the 0.50–0.65 band §12.3 predicted.** No pretraining, no surprise.
+
+**Two practical findings worth keeping.**
+
+- **`gensim` has no build for Python 3.14**, so Skip-gram is written out from Lab 3 in `src/skipgram.py`, using negative sampling rather than the lab's full softmax (scoring all 17,701 words per pair would take hours). The vectors are sound: `১৯৭১ → মার্চ, জিয়াউর, ১৯৭২`; `সরকার → মুজিবনগর, প্রবাসী`; and they cover 94% of dev words. Each seed trains its own vectors, because the training itself is random.
+- **BoW + SVM never converges**, at 5,000 iterations or 20,000, because raw counts here run to 55 with no upper bound. TF-IDF converges easily since it scales everything to 1. Its row is therefore flagged in the output and in the log rather than quietly reported — a concrete demonstration of why the IDF weighting earns its place.
+
+**The lab-versus-library check (§7.1 asks for it):** our hand-written Naive Bayes and scikit-learn's `MultinomialNB` predict **the same label on 100% of 200 dev records**, and score identically (0.487). Run it with `python src/train_classical.py --lab-check`.
 
 **How a record's three parts feed the simple models:** fit a separate vectorizer for the passage, the question, and the answer, then stack all three side by side. That way the model can treat a word differently depending on which part it appeared in. For no-passage records, the passage block is just zeros. What a bag-of-words model *still* can't see is whether the answer's words actually match the passage — that's what M11 and M12 add.
 
