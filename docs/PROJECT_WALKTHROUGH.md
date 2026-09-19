@@ -1479,6 +1479,31 @@ Note the colour rule: green means the model **beat** the fuzzy rule (0.591). Bag
 Logistic Regression lands on exactly 0.591, which is a tie, not a win — so it is grey. Only
 two of the twelve are genuinely above that line.
 
+#### What the five models actually scored
+
+| Model | dev macro-F1 | hard |
+|---|---|---|
+| `rnn` | 0.560 ±0.009 | **0.605** |
+| `bilstm_attn` | 0.551 ±0.003 | 0.598 |
+| `bilstm` | 0.551 ±0.004 | 0.585 |
+| `birnn` | 0.553 ±0.001 | 0.583 |
+| `transformer_scratch` | 0.465 ±0.072 ⚠️ | 0.433 |
+| *the fuzzy rule to beat* | | *0.591* |
+| *best classical model* | | *0.610* |
+
+Three things worth saying out loud:
+
+**The simplest model won.** The plain RNN beat the bidirectional one, the stacked BiLSTM and
+the attention model. On 6,134 records the extra capacity gets spent memorising.
+
+**None of them beat the best classical model.** Reading words in order, by itself, bought
+nothing here.
+
+**The Transformer collapsed on one seed out of three.** It scored 0.364 on seed 2024 —
+answering one class for nearly everything — which is why its spread is ±0.072 while every
+other model sits under ±0.01. A Transformer with no pretraining, on this little data, is
+unstable. That instability is a finding, not something to hide or re-roll.
+
 #### One design rule behind all of this
 
 The demo does not build its own copy of the feature pipeline. It calls `fit_model()` in
@@ -1490,3 +1515,145 @@ from scratch and checks the saved copy agrees with it on 200 dev records.
 The test split is not used anywhere in the demo. It trains on train, quotes dev scores, and
 the clickable examples come from dev. There is a test for that too — it parses both files and
 fails if either one so much as mentions loading `test`.
+
+---
+
+### 18.10 Step 11.7 (done) — Neural networks, built from scratch (M3 and M13)
+
+Everything up to here either counted words or compared strings. None of those models can read
+a sentence *in order*. This step builds the first models that can.
+
+**Two families, five models:**
+
+| Name | What it is | Lab |
+|---|---|---|
+| `rnn` | reads the text left to right, one word at a time | 4 |
+| `birnn` | reads it both ways and joins the two endings | 4 |
+| `bilstm` | two stacked LSTM layers, both directions | 4 |
+| `bilstm_attn` | a BiLSTM that can also look back at every word it read | 4 |
+| `transformer_scratch` | the same design as BanglaBERT, with none of its training | 5 |
+
+**Run them:**
+
+```bash
+python src/train_neural.py --check                     # prove the fixes below
+python src/train_neural.py --model bilstm_attn         # one model, full report
+python src/train_neural.py --all --seeds --log         # all five, 3 seeds, recorded
+```
+
+All on CPU. The heaviest model takes about a minute per epoch, and training usually stops
+itself after 5–8 epochs.
+
+#### Where the words come from
+
+Each record becomes `passage <SEP> question <SEP> answer`, the same text every other model
+sees, from `preprocess.as_tokens`. Then:
+
+- A **vocabulary** is built from the **train split only**, keeping words seen at least twice
+  (17,703 words). A word that appears only in dev is `<UNK>` to the model — otherwise dev
+  would have leaked into training through the vocabulary itself.
+- Each word starts from its **Skip-gram vector** from step 11.5, if it has one. Our Skip-gram
+  covers 100% of this vocabulary, because both were built from the same tokenizer with the
+  same "seen twice" rule.
+- The Transformer is the exception: it starts from **random** vectors, on purpose. It is
+  meant to show what a Transformer can do with no pretraining at all.
+
+#### Three mistakes in the lab code, and what this does instead
+
+This is the part worth showing a teacher, because each one is a real bug that would quietly
+produce worse numbers rather than an error message. `--check` demonstrates all three on real
+dev records.
+
+**1. The lab reads the final state off a padded batch.**
+
+Sentences in a batch have different lengths, so the short ones are filled out with `<PAD>`.
+The lab then takes the RNN's state after the *last* position — which for a short record is
+the state after it has finished running over padding. Its "summary of the sentence" is partly
+a summary of nothing.
+
+The fix is `pack_padded_sequence`, which tells the RNN each record's real length. Measured on
+eight real dev records, shortest to longest:
+
+```
+ tokens   packed vs alone   unpacked vs alone
+      6          0.000000            0.517552
+     11          0.000000            0.391612
+    ...
+    252          0.000000            0.000000
+```
+
+"alone" means running that one record by itself with no padding — the ground truth. Packed
+matches it exactly. The lab's way is off by ~0.5 per number, and the error disappears only
+for the longest record in the batch, which is the one with no padding.
+
+**2. The lab averages the Transformer's output over the padding too.**
+
+Lab 5 ends with `encoded.mean(dim=1)` — the average over every position. Its example sentences
+are all 8 words long, so this is harmless there. Ours run from 3 to 250 tokens, so for a short
+record that average is mostly padding. Here the average is **masked**: padding contributes
+nothing and the division uses the real length. The check confirms a record now scores
+identically whether it sits alone or in a heavily padded batch.
+
+**3. The lab scales up the embeddings but not their starting size.**
+
+Lab 5 multiplies word vectors by `sqrt(d_model)` before adding the position signal — standard
+practice, and it only makes sense if the vectors start small. PyTorch's default starting size
+is N(0,1), so after scaling the word vectors are about **11×** larger than the position
+signal, which is always between −1 and +1. The position information is effectively drowned
+out, and a model that cannot hear word order is not really a Transformer.
+
+Starting the embedding at `std = 1/sqrt(d_model)` puts them on the same footing:
+
+```
+  token vector spread  1.00   position signal spread  0.67
+  (with PyTorch's default N(0,1) start it would be 11.30: position drowned out)
+```
+
+This one is not in the guide — it was found while building this step.
+
+#### How training stops itself
+
+After every pass over the training data, the model is scored on dev. The **best** epoch is
+kept, and training stops once dev loss has failed to improve three times in a row. A real run
+looks like this:
+
+```
+epoch 1  train 0.6934  dev 0.6878      <- best so far
+epoch 2  train 0.6683  dev 0.6774      <- best, and this is the model that gets kept
+epoch 3  train 0.6267  dev 0.7034      worse
+epoch 4  train 0.5676  dev 0.7302      worse
+epoch 5  train 0.5151  dev 0.7935      worse -> stop, go back to epoch 2
+```
+
+Training loss keeps falling while dev loss climbs: the model is **memorising** the training
+set. With 6,134 records and ~3.5 million weights, that happens within a few epochs, and it is
+exactly what early stopping exists to catch.
+
+**One honest caveat.** Dev is used to choose when to stop, so dev scores here are slightly
+flattering. The test split is untouched and will be the real judge, once, at the end.
+
+#### Where the attention model looked
+
+`--attention` takes 20 dev records (10 correct, 10 hallucinated, half of each hard) and
+reports how the model split its attention across the input:
+
+```
+group                   n   passage  question    answer    <SEP>
+correct / easy          5      0.71      0.15      0.10     0.04
+correct / hard          5      0.69      0.21      0.06     0.04
+hallucinated / easy     5      0.77      0.11      0.09     0.03
+hallucinated / hard     5      0.67      0.20      0.09     0.04
+```
+
+About 70% of the attention lands on the passage, which is at least the right place to look.
+On the *hard* records it shifts a little towards the question (0.15 → 0.21) and away from the
+answer — consistent with the passage alone no longer settling it.
+Be careful how much you claim from this: attention shows what the model *used*, not that it
+reasoned. It is a description, not an explanation.
+
+#### One guard worth knowing about
+
+A network that finds no signal does not error — it settles on answering the same thing every
+time, which scores about 0.333 and looks like a merely bad model. The code detects this and
+says so directly: `WARNING: predicts correct for 100% of records - it found no signal`. That
+turns a silent failure into a visible one.

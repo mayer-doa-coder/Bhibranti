@@ -25,7 +25,7 @@
 | Hand-made features (n-gram LM, edit distance) | ✅ Done — 24 tests pass; V6 baseline measured | `src/features.py`, `tests/test_features.py` |
 | Input-format builder | ✅ Done — 22 tests pass; answer/question never truncated | `src/preprocess.py`, `tests/test_preprocess.py` |
 | Simple models (M1, M2, M11, M12) | ✅ Done — 35 tests pass; first real scores | `src/train_classical.py`, `src/skipgram.py` |
-| Neural models (M3, M13) | ⬜ Not built yet | `src/train_neural.py` (planned) |
+| Neural models (M3, M13) | ✅ Done — 65 tests pass; `--check` proves 3 fixes to the lab code | `src/train_neural.py`, `tests/test_train_neural.py` |
 | Pretrained transformers (M4/M5) | ⬜ Not built yet | `src/train_transformer.py` (planned) |
 | Further pretraining (M6) | ⬜ Not built yet | `src/further_pretrain.py` (planned) |
 | Scoring + result tables | ✅ Done — 28 tests pass; Table 5 written | `src/evaluate.py`, `tests/test_evaluate.py` |
@@ -706,6 +706,81 @@ pooled = (encoded * keep).sum(1) / keep.sum(1).clamp(min=1)
 **One more thing about character n-grams:** Bengali words change shape a lot depending on grammar (inflection) and combine freely (compounding), so word-level features can miss related words. Character-level features partly fix this, and also catch near-miss wrong answers that differ by only a letter or two.
 
 **Expected score for classical models: 0.50–0.65.** That's the *correct*, expected result at this data size — these models have no pretraining to lean on. It's not a failure.
+
+### 7.1e What was actually built (M3 + M13)
+
+`src/train_neural.py`, CPU only, PyTorch 2.12.1+cpu. 65 tests in `tests/test_train_neural.py`.
+
+```bash
+python src/train_neural.py --check                     # proves the three fixes below
+python src/train_neural.py --all --seeds --log         # 5 models x 3 seeds
+python src/train_neural.py --model bilstm_attn --attention
+```
+
+**Three mistakes in the lab code, each demonstrated by `--check` rather than asserted.**
+
+1. **Padding corrupts the recurrent models' final state.** Lab 4 reads the state at the last
+   position of a padded batch, so a short record's "summary" is the state after running over
+   `<PAD>`. Every batch here is packed. Measured against running each record alone (no padding
+   at all), the packed state matches to 0.000000 while the lab's way is off by ~0.5 per number
+   — and agrees only for the single longest record in the batch, the one with no padding.
+2. **Lab 5 averages the Transformer's output over padding too.** Harmless for its 8-word toy
+   sentences, wrong for inputs of 3–250 tokens. The average here is masked, and `--check`
+   confirms a record scores identically alone or in a heavily padded batch.
+3. **Not in this guide — found while building.** Lab 5 scales embeddings by `sqrt(d_model)`
+   but leaves PyTorch's default `N(0,1)` start, so token vectors come out ~11x larger than the
+   position signal (which is ±1) and word order is effectively drowned out. Starting the
+   embedding at `std = d_model ** -0.5` puts them level (measured: 1.00 vs 0.67).
+
+**Two settings the guide left open, and why.**
+
+| Setting | Value | Reason |
+|---|---|---|
+| Gradient clip norm | 5.0 | §7.1c says "clip gradients" without a number; 5.0 is the usual default |
+| Hidden size | 128 for every M3 model | the lab's own example size, and keeping it equal across the four means the comparison is about architecture, not capacity |
+| CPU threads | 6 | measured on this machine: 1 thread 128 s/epoch, 4: 59, **6: 57**, 10 (torch's default): 64, 16: 161. More threads is slower — the matrices are small, so thread overhead dominates |
+
+**A guard worth knowing about.** A network that finds no signal does not raise an error; it
+settles on answering the same thing every time, which scores ~0.333 and reads as a merely bad
+model. `collapse_warning()` detects that and says so: `WARNING: predicts correct for 100% of
+records - it found no signal`. The run is still logged, with the warning attached.
+
+**Honest caveat on every number in this section.** Dev is used to decide when to stop training
+and which epoch to keep, so these dev scores are mildly optimistic. The test split is untouched.
+
+### 7.1f The M3 / M13 results
+
+`python src/train_neural.py --all --seeds --log`, dev split, F2 input, V1 preprocessing,
+3 seeds each, CPU. `hard` is the PRD G4 target.
+
+| Model | Lab | dev macro-F1 | has-context + **hard** | epochs | seeds |
+|---|---|---|---|---|---|
+| Vanilla RNN (`rnn`) | 4 | 0.560 ±0.009 | **0.605** — above the fuzzy rule | 4.7 | 3 |
+| BiLSTM + attention (`bilstm_attn`) | 4 | 0.551 ±0.003 | **0.598** — above the fuzzy rule | 5.0 | 3 |
+| Stacked BiLSTM (2 layers) (`bilstm`) | 4 | 0.551 ±0.004 | **0.585** | 5.0 | 3 |
+| Bidirectional RNN (`birnn`) | 4 | 0.553 ±0.001 | **0.583** | 5.0 | 3 |
+| Transformer from scratch (`transformer_scratch`) | 5 | 0.465 ±0.072 ⚠️ found no signal | **0.433** | 5.7 | 3 |
+| *the bars to clear* | | | *exact 0.487 · fuzzy 0.591* | | |
+| *best classical (tfidf_logreg / tfidf_svm)* | 2–3 | | *0.610* | | |
+
+**Four things this table says.**
+
+1. **The plain RNN is the best of them**, and the only architecture that clears the fuzzy
+   rule by a clear margin. Bidirectionality, stacking and attention all cost a little rather
+   than gaining: on 6,134 records the extra capacity is spent memorising, not learning.
+2. **None of them beats the best classical model** (`tfidf_logreg`, 0.610 on hard). Reading
+   the words in order is not, by itself, worth anything here.
+3. **The from-scratch Transformer is the weakest thing in the project — and that is the
+   point.** It has the same architecture family as BanglaBERT and none of its pretraining.
+   Guide 7.1d predicted it would land near the classical models; it lands below them.
+4. **It is also the least stable.** Its spread across seeds is ±0.072 where every other
+   model sits at ±0.001 to ±0.009, and on seed 2024 it collapsed outright to answering one
+   class for nearly everything (0.364). `collapse_warning()` flagged that run rather than
+   letting it pass as a merely poor score. An attention model with no pretraining on this
+   little data is a coin toss that sometimes lands on its edge.
+
+**What this sets up.** The gap between `transformer_scratch` (0.433 on hard) and a fine-tuned
+BanglaBERT is the measurement M4 exists to make: same design, different history.
 
 ### 7.2 The pretrained transformer models
 

@@ -24,9 +24,11 @@ requirements in [docs/PRD.md](docs/PRD.md); recipes in
 ## Current status
 
 **M0 done. M1 done. M2 done (kappa = 0.717). M3 done (test kappa = 0.865, merged, D8 met,
-180 flagged pairs excluded). M4 under way — 6 of the ladder's steps built and measured
-(text tools, features, input formats, scoring, the classical models, the M10 ablation).
-Next up: `src/train_neural.py` — the recurrent models.**
+180 flagged pairs excluded). M4 under way — the ladder is built through M13: text tools,
+features, input formats, scoring, the classical models, the M10 ablation, and the neural
+models (M3 + M13). `src/train_transformer.py` is written and tested; the pretrained encoders
+(M4/M5) need a GPU and run from `notebooks/02_bert_gpu.ipynb`.
+Next up: fine-tune BanglaBERT on Colab.**
 
 **Usable data (load it only through `src/splits.py`):** train 3,067 pairs / 6,134 records ·
 dev 619 / 1,238 · test 614 / 1,228.
@@ -129,7 +131,24 @@ dev 619 / 1,238 · test 614 / 1,228.
       0.549 / 0.610 / 215,601 features).
       **No Prometheus/Grafana** - removed 2026-09-19 at the user's request. Do not add
       metrics endpoints, `src/telemetry.py`, or an `ops/` stack back.
-- [ ] Model ladder: next is `src/train_neural.py` (M3 recurrent models, M13 Transformer)
+- [x] **M4 step 7 - `src/train_neural.py`** (Labs 4-5): M3 rnn/birnn/bilstm/bilstm_attn and
+      M13 transformer_scratch, CPU, 3 seeds each. **rnn is the best at 0.560 / 0.605 hard** -
+      the SIMPLEST architecture won; bidirectionality, stacking and attention all cost a
+      little. None beats the best classical model (0.610). **transformer_scratch is the
+      weakest AND least stable: 0.465 ±0.072, collapsed outright on seed 2024 (0.364)** -
+      flagged by `collapse_warning()`, not hidden. Three fixes to the lab code, each
+      demonstrated by `--check` on real records: packed sequences (the lab reads its final
+      state off padding), masked mean pooling, and an embedding init that stops token vectors
+      drowning the position signal 11:1. 67 tests, mutation-tested.
+- [x] **M4 step 8 - `src/train_transformer.py`** (M4/M5): BanglaBERT, MuRIL, XLM-R, mBERT.
+      PRD recipe by default, `--two-stage` (freeze head, then unfreeze top layers) as the
+      small-data fallback from the reference notebooks. **Refuses to run BanglaBERT without
+      csebuetnlp/normalizer** rather than silently scoring lower - both reference notebooks
+      miss this. No back-translation and no LLM blended in (both tested for). 24 tests.
+- [x] **Notebooks** - `00_full_walkthrough.ipynb` (the whole pipeline end to end with charts,
+      runs in ~9 min, verified to execute with 0 errors), `01_neural_gpu.ipynb`,
+      `02_bert_gpu.ipynb` (Colab + Drive). They import `src/`, never re-implement it.
+- [ ] Next: run `02_bert_gpu.ipynb` on Colab (M4/M5), then M6 FPT, M7 ensemble, M8 LLM reference
 
 **All 13 remaining subjects are in.** Nothing is excluded for being hard or for needing outside
 knowledge — law, science, BCS and literature are all included on equal footing (966 pairs,
@@ -223,8 +242,13 @@ python src/app.py                                # then open http://127.0.0.1:80
 # Not yet written (M4-M6) - see guide §1.3 for the planned modules
 python src/train_classical.py    --model tfidf_nb --seed 42          # M1, M2, M11, M12 (Labs 1-3)
 python src/train_classical.py    --model tfidf_nb --variant V2       # M10 preprocessing ablation
-python src/train_neural.py       --model bilstm_attn --seed 42       # M3 (Lab 4)
-python src/train_neural.py       --model transformer_scratch --seed 42   # M13 (Lab 5)
+# M4 step 7 - the neural models (CPU only, ~1 min/epoch for the heaviest)
+python src/train_neural.py --check                      # prove the 3 fixes to the lab code
+python src/train_neural.py --demo                       # one record through every model
+python src/train_neural.py --model bilstm_attn          # M3 (Lab 4), one model, full report
+python src/train_neural.py --model transformer_scratch  # M13 (Lab 5)
+python src/train_neural.py --all --seeds --log          # all 5, 3 seeds, recorded
+python src/train_neural.py --model bilstm_attn --attention   # where did it look?
 python src/train_transformer.py  --model csebuetnlp/banglabert --seed 42
 python src/evaluate.py --checkpoint out/best --split dev --shuffle-order # M14 word-order test
 python src/evaluate.py --checkpoint out/best --split dev      # any number of times
@@ -266,8 +290,12 @@ python src/evaluate.py --checkpoint out/best --split test     # EXACTLY ONCE, at
 | `src/app.py` | ✅ The demo: `/` judge an answer, `/models` the scoreboard, `/health` |
 | `web/templates/` · `web/static/` | ✅ The demo's pages and its one stylesheet |
 | `tests/test_serving.py` | ✅ 29 tests. The ones needing real models skip themselves if `--build` has not been run |
-| `src/train_neural.py` | ⬜ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5) |
-| `src/train_transformer.py` | ⬜ Pretrained encoder fine-tuning (M4/M5) |
+| `src/train_neural.py` | ✅ M3 RNN/BiRNN/BiLSTM(+attn), M13 Transformer from scratch (Labs 4–5). CPU, PyTorch. `--check` proves the 3 fixes to the lab code |
+| `tests/test_train_neural.py` | ✅ 65 tests. Mutation-tested: breaking any of the 3 fixes makes a named test fail |
+| `src/train_transformer.py` | ✅ Pretrained encoders (M4/M5): BanglaBERT, MuRIL, XLM-R, mBERT. `--two-stage` for the small-data recipe. **Refuses BanglaBERT without csebuetnlp normalizer** |
+| `tests/test_train_transformer.py` | ✅ 24 tests. No download, no GPU — the guards that would otherwise cost accuracy silently |
+| `src/colab_setup.py` | ✅ `prepare()` — mounts Drive, adds `src/` to the path, prints a data hash to confirm Drive matches your laptop |
+| `notebooks/01_neural_gpu.ipynb` · `02_bert_gpu.ipynb` | ✅ Colab GPU drivers. Thin: they import `src/`, never re-implement it |
 | `src/further_pretrain.py` | ⬜ MLM further pretraining (mBERT / XLM-R only) |
 | `src/evaluate.py` | ✅ Metrics, breakdowns, baselines, M14 shuffling, McNemar, pair-level bootstrap. `report(records, predictions)` |
 | `tests/test_evaluate.py` | ✅ One test per scoring rule, checked against hand-worked values |

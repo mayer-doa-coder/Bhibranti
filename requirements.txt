@@ -31,15 +31,32 @@ joblib==1.5.3          # saving fitted models to data/processed/serving/
 
 
 # ---------------------------------------------------------------------------
-# TIER 2 — model ladder. NOT yet used by any script in src/. Uncomment when
-# starting M4 (train_classical.py / train_transformer.py). Left commented so a
-# fresh `pip install -r requirements.txt` stays fast and does not pull ~2.5 GB
+# TIER 1c — the neural models trained from scratch (src/train_neural.py):
+# M3 RNN/BiRNN/BiLSTM/+attention and M13 Transformer.
+#
+# The CPU build, on purpose. These models are small and the corpus is 6,134
+# records, so a GPU spends most of its time waiting; the CPU wheel is ~200 MB
+# instead of ~2.5 GB. If you later fine-tune a pretrained encoder (M4/M5), that
+# step does want CUDA -- install the matching GPU build then.
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+# ---------------------------------------------------------------------------
+torch==2.12.1          # M3 + M13; CPU build (2.12.1+cpu)
+
+
+# ---------------------------------------------------------------------------
+# TIER 2 — the PRETRAINED encoders (M4/M5) and further pretraining (M6). Not
+# used by any script in src/ yet. Uncomment when starting M4. Left commented so
+# a fresh `pip install -r requirements.txt` stays fast and does not pull ~2.5 GB
 # of CUDA wheels before you need them.
 #
 # Pin these at the versions you actually train on, then update this file --
 # an unpinned training run is not reproducible (PRD R5, R6).
+#
+# In Colab, transformers/accelerate/sentencepiece are already present or are installed by
+# the first cell of notebooks/02_bert_gpu.ipynb. The normaliser never is, and BanglaBERT
+# REFUSES to run without it (src/train_transformer.py) rather than silently scoring lower:
+#     pip install git+https://github.com/csebuetnlp/normalizer
 # ---------------------------------------------------------------------------
-# torch
 # transformers
 # datasets
 # accelerate
